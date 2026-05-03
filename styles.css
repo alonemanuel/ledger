@@ -435,8 +435,19 @@ body {
   .kpi-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
   .kpi-value { font-size: 24px; }
   .hero-value { font-size: 40px; }
-  .app-nav { overflow-x: auto; }
-  .app-nav button { white-space: nowrap; }
+
+  .app-h { gap: 8px 8px; }
+  .brand { gap: 8px; min-width: 0; flex-wrap: wrap; }
+  .brand-sub { display: none; }
+  .header-actions { gap: 6px; min-width: 0; max-width: 100%; }
+
+  .fx-summary { gap: 6px; padding: 6px 10px; min-width: 0; }
+  .fx-mono, .fx-meta { display: none; }
+  .fx-detail { width: min(320px, calc(100vw - 32px)); right: auto; left: 0; }
+
+  .app-nav { overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+  .app-nav::-webkit-scrollbar { display: none; }
+  .app-nav button { white-space: nowrap; padding: 10px 10px; }
 }
 
 /* ── Bootstrap / sign-in screen ─────────────────────────────────────── */

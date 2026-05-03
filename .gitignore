@@ -22,3 +22,7 @@ dist/smoke-screenshot.png
 # Node
 node_modules/
 
+# Worktrees + probe output
+.worktrees/
+probe-out/
+
