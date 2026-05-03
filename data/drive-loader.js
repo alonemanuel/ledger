@@ -63,26 +63,17 @@
     localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: accessToken, expiresAt }));
   }
 
-  // Attempts to get a fresh token without any user-visible UI.
-  // Succeeds silently when Google session is active and consent was previously granted.
-  async function trySignInSilent() {
-    await ensureGisInited();
-    return new Promise((resolve) => {
-      tokenClient.callback = (response) => {
-        if (response.error || !response.access_token) {
-          resolve(false);
-          return;
-        }
-        saveToken(response);
-        resolve(true);
-      };
-      tokenClient.requestAccessToken({ prompt: '' });
-    });
-  }
-
-  async function requestSignIn() {
-    await ensureGisInited();
+  // Synchronous from caller's perspective up to and including
+  // requestAccessToken — this MUST be invoked inside the user-gesture
+  // stack of a click handler, otherwise Chrome treats the OAuth popup as
+  // programmatic and blocks it. Pre-initialize via init() before the
+  // signin button is shown so we don't need an await here.
+  function requestSignIn() {
     return new Promise((resolve, reject) => {
+      if (!tokenClient) {
+        reject(new Error('Sign-in not ready — Google Identity library not loaded yet'));
+        return;
+      }
       tokenClient.callback = (response) => {
         if (response.error) {
           reject(new Error(`OAuth error: ${response.error}`));
@@ -94,6 +85,12 @@
         }
         saveToken(response);
         resolve();
+      };
+      tokenClient.error_callback = (err) => {
+        const t = err?.type || '';
+        if (t === 'popup_failed_to_open') reject(new Error('POPUP_BLOCKED'));
+        else if (t === 'popup_closed') reject(new Error('POPUP_CLOSED'));
+        else reject(new Error(`OAuth error: ${err?.message || t || 'unknown'}`));
       };
       tokenClient.requestAccessToken({ prompt: 'select_account' });
     });
@@ -282,13 +279,8 @@
         return await fetchAndPopulate();
       } catch (e) {
         if (e.message !== 'AUTH_EXPIRED') throw e;
-        // token expired — fall through to silent re-auth
       }
     }
-    // Try to get a token silently (no popup) if Google session is still active.
-    const silentOk = await trySignInSilent();
-    if (silentOk) return await fetchAndPopulate();
-    // Silent auth failed — caller should show the sign-in button.
     throw new Error('NEEDS_SIGNIN');
   }
 
@@ -300,7 +292,14 @@
   }
 
   async function loadDemoData() {
-    const src = await fetch('data/data.example.js').then(r => r.text());
+    // Prefer the inlined source from the bundled build (bundle.py injects
+    // window.__LEDGER_DEMO_SOURCE__). Fall back to fetch for the dev
+    // server, which serves data.example.js directly.
+    const src = window.__LEDGER_DEMO_SOURCE__
+      || await fetch('data/data.example.js').then(r => {
+        if (!r.ok) throw new Error(`Demo data not available (${r.status})`);
+        return r.text();
+      });
     // Run in a local scope so its `const` declarations don't clash with
     // the already-declared globals from data.js.
     new Function(src)();
@@ -320,12 +319,12 @@
   }
 
   window.DriveLoader = {
+    init: ensureGisInited,
     bootstrap,
     signOut,
     isSignedIn: () => !!accessToken,
     fetchAndPopulate,
     requestSignIn,
-    trySignInSilent,
     loadCachedToken,
     loadDemoData,
   };
