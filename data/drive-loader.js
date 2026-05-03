@@ -63,9 +63,17 @@
     localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: accessToken, expiresAt }));
   }
 
-  async function requestSignIn() {
-    await ensureGisInited();
+  // Synchronous from caller's perspective up to and including
+  // requestAccessToken — this MUST be invoked inside the user-gesture
+  // stack of a click handler, otherwise Chrome treats the OAuth popup as
+  // programmatic and blocks it. Pre-initialize via init() before the
+  // signin button is shown so we don't need an await here.
+  function requestSignIn() {
     return new Promise((resolve, reject) => {
+      if (!tokenClient) {
+        reject(new Error('Sign-in not ready — Google Identity library not loaded yet'));
+        return;
+      }
       tokenClient.callback = (response) => {
         if (response.error) {
           reject(new Error(`OAuth error: ${response.error}`));
@@ -78,9 +86,6 @@
         saveToken(response);
         resolve();
       };
-      // Fires for popup_failed_to_open (browser blocked the popup) and
-      // popup_closed (user dismissed it). Without this, the promise would
-      // hang forever and the UI would be stuck on the fetching spinner.
       tokenClient.error_callback = (err) => {
         const t = err?.type || '';
         if (t === 'popup_failed_to_open') reject(new Error('POPUP_BLOCKED'));
@@ -307,6 +312,7 @@
   }
 
   window.DriveLoader = {
+    init: ensureGisInited,
     bootstrap,
     signOut,
     isSignedIn: () => !!accessToken,

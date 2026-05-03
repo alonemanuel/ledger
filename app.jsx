@@ -164,6 +164,10 @@ function Bootstrap() {
   const start = async () => {
     setError(null); setPhase('loading');
     try {
+      // Initialize GIS before showing the signin button so the click
+      // handler can call requestAccessToken synchronously and Chrome
+      // doesn't classify the OAuth window as a programmatic popup.
+      await window.DriveLoader.init();
       await window.DriveLoader.bootstrap();
       setTick(x => x + 1); setPhase('ready');
     } catch (e) {
