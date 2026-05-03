@@ -62,12 +62,16 @@ const fmtMonth = (ym, opts = {}) => {
 // ── DERIVATIONS ────────────────────────────────────────────────────────────
 const accountById = (id) => ACCOUNTS.find(a => a.id === id);
 
-// snapshot map by account
+// snapshot map by account — rebuilt from SNAPSHOTS, can be refreshed after data loads
 const snapshotMap = {};
-SNAPSHOTS.forEach(s => {
-  if (!snapshotMap[s.accountId]) snapshotMap[s.accountId] = {};
-  snapshotMap[s.accountId][s.ym] = s.balance;
-});
+function rebuildDerivations() {
+  for (const k in snapshotMap) delete snapshotMap[k];
+  SNAPSHOTS.forEach(s => {
+    if (!snapshotMap[s.accountId]) snapshotMap[s.accountId] = {};
+    snapshotMap[s.accountId][s.ym] = s.balance;
+  });
+}
+rebuildDerivations();
 
 const balanceILS = (accountId, ym) => {
   const acc = accountById(accountId);
@@ -274,4 +278,5 @@ window.Fin = {
   recentActivity, accountSeries, avgBalance, passivePerAccount,
   GROUP_COLOR, CATEGORY_COLOR, INCOME_TYPE_COLOR,
   PRETTY_TYPE, PRETTY_CAT,
+  rebuildDerivations,
 };

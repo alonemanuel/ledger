@@ -1,5 +1,5 @@
 # Private data (never commit)
-data/data.js
+# data/data.js (now committed — empty scaffold)
 
 # Built artifacts
 dist/

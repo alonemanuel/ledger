@@ -436,3 +436,96 @@ body {
   .app-nav { overflow-x: auto; }
   .app-nav button { white-space: nowrap; }
 }
+
+/* ── Bootstrap / sign-in screen ─────────────────────────────────────── */
+.boot-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg);
+}
+.boot-card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 40px 36px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+}
+.boot-mark {
+  font-size: 48px;
+  color: var(--accent);
+  margin-bottom: 8px;
+  line-height: 1;
+}
+.boot-title {
+  font-family: 'Newsreader', serif;
+  font-size: 32px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--ink);
+}
+.boot-sub {
+  font-size: 13px;
+  color: var(--ink-2);
+  margin-bottom: 32px;
+}
+.boot-status {
+  font-size: 14px;
+  color: var(--ink-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.boot-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--rule);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.boot-btn {
+  display: block;
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px 18px;
+  background: var(--ink);
+  color: var(--bg);
+  border: none;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  transition: opacity 0.15s;
+}
+.boot-btn:hover { opacity: 0.85; }
+.boot-btn-ghost {
+  background: transparent;
+  color: var(--ink-2);
+  border: 1px solid var(--rule);
+  margin-top: 8px;
+}
+.boot-note {
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-top: 16px;
+  line-height: 1.6;
+}
+.boot-error {
+  font-size: 13px;
+  color: oklch(50% 0.18 30);
+  background: oklch(95% 0.05 30);
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  word-break: break-word;
+}

@@ -23,15 +23,25 @@ def read(rel):
 
 
 def main():
-    data_path = "data/data.example.js" if USE_EXAMPLE else "data/data.js"
-    if not (REPO_ROOT / data_path).exists():
-        print(f"ERROR: {data_path} missing.", file=sys.stderr)
-        if not USE_EXAMPLE:
-            print("Run `python scripts/generate_data.py` first.", file=sys.stderr)
-        sys.exit(1)
+    if USE_EXAMPLE:
+        # Synthetic demo: static data, no Drive auth, no loader
+        data_path = "data/data.example.js"
+        if not (REPO_ROOT / data_path).exists():
+            print(f"ERROR: {data_path} missing.", file=sys.stderr)
+            sys.exit(1)
+        data_js = read(data_path)
+        loader_js = ""  # not needed
+        extra_scripts = ""
+    else:
+        # Live mode: empty data scaffold + drive-loader + Papa Parse + GIS
+        data_js = read("data/data.js")
+        loader_js = read("data/drive-loader.js")
+        extra_scripts = (
+            '<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>\n'
+            '<script src="https://accounts.google.com/gsi/client" async defer></script>\n'
+        )
 
     styles = read("styles.css")
-    data_js = read(data_path)
     helpers = read("data/helpers.js")
     tweaks = read("tweaks-panel.jsx")
     icons = read("components/icons.jsx")
@@ -41,6 +51,15 @@ def main():
     cashflow = read("components/tab-cashflow.jsx")
     passive = read("components/tab-passive.jsx")
     app = read("app.jsx")
+
+    # In example mode, replace Bootstrap with direct App render (no auth flow)
+    if USE_EXAMPLE:
+        app = app.replace(
+            'ReactDOM.createRoot(document.getElementById(\'root\')).render(<Bootstrap/>);',
+            'ReactDOM.createRoot(document.getElementById(\'root\')).render(<App/>);'
+        )
+
+    loader_script = f'<script>{loader_js}</script>' if loader_js else ''
 
     html = f"""<!doctype html>
 <html lang="en">
@@ -60,8 +79,9 @@ def main():
 <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
-<script>{data_js}</script>
+{extra_scripts}<script>{data_js}</script>
 <script>{helpers}</script>
+{loader_script}
 <script type="text/babel">{tweaks}</script>
 <script type="text/babel">{icons}</script>
 <script type="text/babel">{charts}</script>
@@ -79,7 +99,7 @@ def main():
         f.write(html)
     print(f"✓ Wrote {out}")
     print(f"  Size: {os.path.getsize(out):,} B")
-    print(f"  Data source: {data_path}")
+    print(f"  Mode: {'example (synthetic data)' if USE_EXAMPLE else 'live (Google Drive)'}")
 
 
 if __name__ == "__main__":

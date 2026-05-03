@@ -122,4 +122,79 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+function Bootstrap() {
+  const [phase, setPhase] = useState('loading');   // loading | signin | fetching | ready | error
+  const [error, setError] = useState(null);
+  const [tick, setTick] = useState(0);
+
+  const start = async () => {
+    setError(null);
+    try {
+      if (window.DriveLoader.loadCachedToken()) {
+        setPhase('fetching');
+        await window.DriveLoader.fetchAndPopulate();
+        setTick(x => x + 1); setPhase('ready');
+      } else {
+        setPhase('signin');
+      }
+    } catch (e) {
+      setError(e.message || String(e)); setPhase('error');
+    }
+  };
+
+  const handleSignIn = async () => {
+    setError(null); setPhase('fetching');
+    try {
+      await window.DriveLoader.requestSignIn();
+      await window.DriveLoader.fetchAndPopulate();
+      setTick(x => x + 1); setPhase('ready');
+    } catch (e) {
+      setError(e.message || String(e)); setPhase('error');
+    }
+  };
+
+  useEffect(() => { start(); }, []);
+
+  if (phase === 'ready') {
+    return <App key={tick}/>;
+  }
+
+  return (
+    <div className="boot-screen">
+      <div className="boot-card">
+        <div className="boot-mark">◐</div>
+        <div className="boot-title">Ledger</div>
+        <div className="boot-sub">Personal finance · live from Google Drive</div>
+
+        {phase === 'loading' && <div className="boot-status">Loading…</div>}
+
+        {phase === 'fetching' && (
+          <div className="boot-status">
+            <div className="boot-spinner"/>
+            <div>Fetching CSVs from Drive…</div>
+          </div>
+        )}
+
+        {phase === 'signin' && (
+          <>
+            <button className="boot-btn" onClick={handleSignIn}>Sign in with Google</button>
+            <div className="boot-note">
+              Read-only access to your Drive folder.<br/>
+              Tokens stay in your browser; nothing is sent anywhere else.
+            </div>
+          </>
+        )}
+
+        {phase === 'error' && (
+          <>
+            <div className="boot-error">⚠ {error}</div>
+            <button className="boot-btn" onClick={start}>Retry</button>
+            <button className="boot-btn boot-btn-ghost" onClick={() => { window.DriveLoader.signOut(); start(); }}>Sign out & retry</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Bootstrap/>);
