@@ -17,34 +17,25 @@ const ACCENT_PALETTES = {
   moss:      { accent: 'oklch(54% 0.10 140)', accent2: 'oklch(66% 0.08 130)' },
 };
 
-function FxStrip({ rate, manualOpen, setManualOpen, manualRate, setManualRate }) {
+function FxStrip() {
+  const [rate, setRate] = useState(window.FinanceData.FX.current);
+  const [live, setLive] = useState(false);
+
+  useEffect(() => {
+    fetch('https://api.frankfurter.app/latest?from=USD&to=ILS')
+      .then(r => r.json())
+      .then(d => {
+        const r = d.rates && d.rates.ILS;
+        if (r) { setRate(r); setLive(true); window.FinanceData.FX.current = r; }
+      })
+      .catch(() => {});
+  }, []);
+
   return (
-    <div className={`fx-strip ${manualOpen ? 'open' : ''}`}>
-      <button className="fx-summary" onClick={() => setManualOpen(!manualOpen)}>
-        <span className="fx-mono">USD/ILS today</span>
-        <strong className="fx-rate">{rate.toFixed(4)}</strong>
-        <span className="fx-meta">manual · set {window.FinanceData.FX.setOn}</span>
-        <span className="fx-caret">{manualOpen ? '▾' : '▸'}</span>
-      </button>
-      {manualOpen && (
-        <div className="fx-detail">
-          <div className="fx-note">
-            Snapshot &amp; income rows in foreign currency are converted using the FX rate of <em>that day</em>; today's "as-of-now" displays use the rate above.
-          </div>
-          <table className="fx-tbl">
-            <thead><tr><th>Month</th><th className="r">USD/ILS</th></tr></thead>
-            <tbody>
-              {Object.entries(window.FinanceData.FX.byMonth).slice(-6).map(([ym, r]) => (
-                <tr key={ym}><td>{Fin.fmtMonth(ym)}</td><td className="r mono">{r.toFixed(4)}</td></tr>
-              ))}
-            </tbody>
-          </table>
-          <label className="fx-override">
-            <span>Override today's rate:</span>
-            <input type="number" step="0.0001" value={manualRate} onChange={e => setManualRate(parseFloat(e.target.value) || 0)}/>
-          </label>
-        </div>
-      )}
+    <div className="fx-strip">
+      <span className="fx-mono">USD/ILS</span>
+      <strong className="fx-rate">{rate.toFixed(4)}</strong>
+      <span className="fx-meta">{live ? 'live' : 'fallback'}</span>
     </div>
   );
 }
@@ -67,15 +58,9 @@ function pathFor(tab, accountId) {
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [{ tab, accountId }, setRoute] = useState(parseUrl);
-  const [manualOpen, setManualOpen] = useState(false);
-  const [manualRate, setManualRate] = useState(window.FinanceData.FX.current);
-
   const goTab = (id) => setRoute({ tab: id, accountId: null });
   const openAccount = (id) => setRoute({ tab: 'accounts', accountId: id });
   const closeAccount = () => setRoute({ tab: 'accounts', accountId: null });
-
-  // apply manual rate
-  useEffect(() => { window.FinanceData.FX.current = manualRate; }, [manualRate]);
 
   // persist route in path
   useEffect(() => {
@@ -126,7 +111,7 @@ function App() {
           >
             <Icon name={t.dark ? 'sun' : 'moon'} size={16}/>
           </button>
-          <FxStrip rate={manualRate} manualOpen={manualOpen} setManualOpen={setManualOpen} manualRate={manualRate} setManualRate={setManualRate}/>
+          <FxStrip/>
         </div>
         <nav className="app-nav">
           {tabs.map(tt => (
