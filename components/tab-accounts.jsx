@@ -41,6 +41,8 @@ function AccountRow({ acc, onOpen, primaryCurrency }) {
 
 function AccountDetail({ acc, onClose }) {
   const series = Fin.accountSeries(acc.id);
+  const idx = ACCS_ACC.findIndex(a => a.id === acc.id);
+  const serial = idx >= 0 ? String(idx + 1).padStart(3, '0') : '—';
   return (
     <div className="acc-detail">
       <header className="acc-detail-h">
@@ -48,6 +50,7 @@ function AccountDetail({ acc, onClose }) {
         <div>
           <h2><Icon name={ACC_TYPE_ICON[acc.type]} size={22}/> {acc.name}</h2>
           <div className="acc-detail-sub">{acc.provider} · {acc.owner} · {acc.currency} · <StatusDot status={acc.status}/> {acc.status}</div>
+          <div className="acc-detail-id"><span className="acc-id-label">#{serial}</span><span className="acc-id-slug">{acc.id}</span></div>
         </div>
       </header>
       <section className="panel">
@@ -81,14 +84,14 @@ function AccountDetail({ acc, onClose }) {
   );
 }
 
-function AccountsTab({ primaryCurrency }) {
-  const [openAcc, setOpenAcc] = useStateAcc(null);
+function AccountsTab({ primaryCurrency, openAccountId, onOpenAccount, onCloseAccount }) {
   const [filterOwner, setFilterOwner] = useStateAcc('all');
   const [filterStatus, setFilterStatus] = useStateAcc('active');
   const [showDetails, setShowDetails] = useStateAcc(false);
 
+  const openAcc = openAccountId ? ACCS_ACC.find(a => a.id === openAccountId) : null;
   if (openAcc) {
-    return <AccountDetail acc={openAcc} onClose={() => setOpenAcc(null)}/>;
+    return <AccountDetail acc={openAcc} onClose={onCloseAccount}/>;
   }
 
   const filtered = ACCS_ACC.filter(a =>
@@ -140,7 +143,7 @@ function AccountsTab({ primaryCurrency }) {
               <span className="panel-sub">{accs.length} account{accs.length>1?'s':''} · {Fin.fmtILS(gTotal)} · {((gTotal/totalNW)*100).toFixed(0)}%</span>
             </header>
             <div className="acc-list">
-              {accs.map(a => <AccountRow key={a.id} acc={a} primaryCurrency={primaryCurrency} onOpen={() => setOpenAcc(a)}/>)}
+              {accs.map(a => <AccountRow key={a.id} acc={a} primaryCurrency={primaryCurrency} onOpen={() => onOpenAccount(a.id)}/>)}
             </div>
           </section>
         );
