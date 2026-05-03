@@ -163,16 +163,16 @@ function Bootstrap() {
 
   const start = async () => {
     setError(null);
+    setPhase('fetching');
     try {
-      if (window.DriveLoader.loadCachedToken()) {
-        setPhase('fetching');
-        await window.DriveLoader.fetchAndPopulate();
-        setTick(x => x + 1); setPhase('ready');
-      } else {
-        setPhase('signin');
-      }
+      await window.DriveLoader.bootstrap();
+      setTick(x => x + 1); setPhase('ready');
     } catch (e) {
-      setError(e.message || String(e)); setPhase('error');
+      if (e.message === 'NEEDS_SIGNIN') {
+        setPhase('signin');
+      } else {
+        setError(e.message || String(e)); setPhase('error');
+      }
     }
   };
 
