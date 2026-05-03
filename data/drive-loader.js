@@ -292,7 +292,14 @@
   }
 
   async function loadDemoData() {
-    const src = await fetch('data/data.example.js').then(r => r.text());
+    // Prefer the inlined source from the bundled build (bundle.py injects
+    // window.__LEDGER_DEMO_SOURCE__). Fall back to fetch for the dev
+    // server, which serves data.example.js directly.
+    const src = window.__LEDGER_DEMO_SOURCE__
+      || await fetch('data/data.example.js').then(r => {
+        if (!r.ok) throw new Error(`Demo data not available (${r.status})`);
+        return r.text();
+      });
     // Run in a local scope so its `const` declarations don't clash with
     // the already-declared globals from data.js.
     new Function(src)();
