@@ -192,6 +192,15 @@ function Bootstrap() {
               Read-only access to your Drive folder.<br/>
               Tokens stay in your browser; nothing is sent anywhere else.
             </div>
+            <button className="boot-btn boot-btn-ghost" onClick={async () => {
+              setError(null); setPhase('fetching');
+              try {
+                await window.DriveLoader.loadDemoData();
+                setTick(x => x + 1); setPhase('ready');
+              } catch (e) {
+                setError(e.message || String(e)); setPhase('error');
+              }
+            }}>Load demo data</button>
           </>
         )}
 

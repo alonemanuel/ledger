@@ -278,6 +278,26 @@
     clearCachedToken();
   }
 
+  async function loadDemoData() {
+    const src = await fetch('data/data.example.js').then(r => r.text());
+    // Run in a local scope so its `const` declarations don't clash with
+    // the already-declared globals from data.js.
+    new Function(src)();
+    // window.FinanceData now points to the example object, but the global
+    // ACCOUNTS/SNAPSHOTS/INCOME/EXPENSES/FX consts (which helpers.js uses
+    // for all Fin.* calls) are still empty. Reuse populateFinanceData to
+    // mutate them in place and rebuild snapshotMap.
+    const ex = window.FinanceData;
+    populateFinanceData({
+      accounts:   ex.ACCOUNTS,
+      snapshots:  ex.SNAPSHOTS,
+      income:     ex.INCOME,
+      expenses:   ex.EXPENSES,
+      fxFull:     ex.FX.byMonth,
+      fxCurrent:  ex.FX.current,
+    });
+  }
+
   window.DriveLoader = {
     bootstrap,
     signOut,
@@ -285,5 +305,6 @@
     fetchAndPopulate,
     requestSignIn,
     loadCachedToken,
+    loadDemoData,
   };
 })();
