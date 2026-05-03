@@ -78,6 +78,15 @@
         saveToken(response);
         resolve();
       };
+      // Fires for popup_failed_to_open (browser blocked the popup) and
+      // popup_closed (user dismissed it). Without this, the promise would
+      // hang forever and the UI would be stuck on the fetching spinner.
+      tokenClient.error_callback = (err) => {
+        const t = err?.type || '';
+        if (t === 'popup_failed_to_open') reject(new Error('POPUP_BLOCKED'));
+        else if (t === 'popup_closed') reject(new Error('POPUP_CLOSED'));
+        else reject(new Error(`OAuth error: ${err?.message || t || 'unknown'}`));
+      };
       tokenClient.requestAccessToken({ prompt: 'select_account' });
     });
   }

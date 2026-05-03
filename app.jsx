@@ -182,7 +182,14 @@ function Bootstrap() {
       await window.DriveLoader.fetchAndPopulate();
       setTick(x => x + 1); setPhase('ready');
     } catch (e) {
-      setError(e.message || String(e)); setPhase('error');
+      if (e.message === 'POPUP_BLOCKED') {
+        setError('Pop-up blocked. Allow pop-ups for this site and try again, or use demo data.');
+        setPhase('signin');
+      } else if (e.message === 'POPUP_CLOSED') {
+        setPhase('signin');
+      } else {
+        setError(e.message || String(e)); setPhase('error');
+      }
     }
   };
 
@@ -210,6 +217,7 @@ function Bootstrap() {
 
         {phase === 'signin' && (
           <>
+            {error && <div className="boot-error">⚠ {error}</div>}
             <button className="boot-btn" onClick={handleSignIn}>Sign in with Google</button>
             <div className="boot-note">
               Read-only access to your Drive folder.<br/>
