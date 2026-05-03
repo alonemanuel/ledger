@@ -51,31 +51,43 @@ function FxStrip({ rate, manualOpen, setManualOpen, manualRate, setManualRate })
 
 const TAB_IDS = ['overview', 'accounts', 'cashflow', 'passive'];
 
-function tabFromUrl() {
-  const seg = location.pathname.replace(/^\/+|\/+$/g, '');
-  return TAB_IDS.includes(seg) ? seg : 'overview';
+function parseUrl() {
+  const segs = location.pathname.split('/').filter(Boolean);
+  const tab = TAB_IDS.includes(segs[0]) ? segs[0] : 'overview';
+  const accountId = (tab === 'accounts' && segs[1]) ? decodeURIComponent(segs[1]) : null;
+  return { tab, accountId };
+}
+
+function pathFor(tab, accountId) {
+  if (tab === 'accounts' && accountId) return `/accounts/${encodeURIComponent(accountId)}`;
+  if (tab === 'overview') return '/';
+  return `/${tab}`;
 }
 
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const [tab, setTab] = useState(tabFromUrl);
+  const [{ tab, accountId }, setRoute] = useState(parseUrl);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualRate, setManualRate] = useState(window.FinanceData.FX.current);
+
+  const goTab = (id) => setRoute({ tab: id, accountId: null });
+  const openAccount = (id) => setRoute({ tab: 'accounts', accountId: id });
+  const closeAccount = () => setRoute({ tab: 'accounts', accountId: null });
 
   // apply manual rate
   useEffect(() => { window.FinanceData.FX.current = manualRate; }, [manualRate]);
 
-  // persist tab in path
+  // persist route in path
   useEffect(() => {
-    const want = tab === 'overview' ? '/' : `/${tab}`;
+    const want = pathFor(tab, accountId);
     if (location.pathname !== want) {
-      history.pushState({ tab }, '', want);
+      history.pushState({ tab, accountId }, '', want);
     }
-  }, [tab]);
+  }, [tab, accountId]);
 
   // back/forward navigation
   useEffect(() => {
-    const onPop = () => setTab(tabFromUrl());
+    const onPop = () => setRoute(parseUrl());
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
@@ -118,14 +130,14 @@ function App() {
         </div>
         <nav className="app-nav">
           {tabs.map(tt => (
-            <button key={tt.id} data-screen-label={tt.label} className={tab === tt.id ? 'on' : ''} onClick={() => setTab(tt.id)}>{tt.label}</button>
+            <button key={tt.id} data-screen-label={tt.label} className={tab === tt.id ? 'on' : ''} onClick={() => goTab(tt.id)}>{tt.label}</button>
           ))}
         </nav>
       </header>
 
       <main className="app-main">
         {tab === 'overview' && <OverviewTab/>}
-        {tab === 'accounts' && <AccountsTab primaryCurrency={t.primaryCurrency}/>}
+        {tab === 'accounts' && <AccountsTab primaryCurrency={t.primaryCurrency} openAccountId={accountId} onOpenAccount={openAccount} onCloseAccount={closeAccount}/>}
         {tab === 'cashflow' && <CashflowTab/>}
         {tab === 'passive' && <PassiveTab/>}
       </main>
