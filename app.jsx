@@ -53,10 +53,7 @@ const TAB_IDS = ['overview', 'accounts', 'cashflow', 'passive'];
 
 function tabFromUrl() {
   const seg = location.pathname.replace(/^\/+|\/+$/g, '');
-  if (TAB_IDS.includes(seg)) return seg;
-  // Back-compat for old #tab=foo links
-  const m = location.hash.match(/tab=(overview|accounts|cashflow|passive)/);
-  return m ? m[1] : 'overview';
+  return TAB_IDS.includes(seg) ? seg : 'overview';
 }
 
 function App() {
@@ -71,7 +68,7 @@ function App() {
   // persist tab in path
   useEffect(() => {
     const want = tab === 'overview' ? '/' : `/${tab}`;
-    if (location.pathname + location.hash !== want) {
+    if (location.pathname !== want) {
       history.pushState({ tab }, '', want);
     }
   }, [tab]);
