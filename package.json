@@ -1,0 +1,16 @@
+{
+  "name": "ledger",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Personal finance dashboard — single-file HTML, React, SVG charts.",
+  "type": "module",
+  "scripts": {
+    "build": "python3 scripts/bundle.py",
+    "build:example": "python3 scripts/bundle.py --example",
+    "test": "node scripts/smoke.mjs",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}

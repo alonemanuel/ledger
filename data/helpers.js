@@ -268,6 +268,27 @@ const PRETTY_CAT = {
   other: 'Other', uncategorized: 'Uncategorized',
 };
 
+// ── TIME RANGE SLICING ─────────────────────────────────────────────────────
+const RANGE_OPTIONS = ['1M', 'MTD', '6M', '1Y', 'YTD', 'MAX'];
+
+function sliceByRange(series, range) {
+  if (!series || !series.length) return series;
+  const ymOf = s => s.ym || (s.date ? s.date.slice(0, 7) : '');
+  const latestYm = ymOf(series[series.length - 1]);
+  switch (range) {
+    case '1M':  return series.slice(-2);
+    case 'MTD': return series.slice(-1);
+    case '6M':  return series.slice(-6);
+    case '1Y':  return series.slice(-12);
+    case 'YTD': {
+      const year = latestYm.slice(0, 4);
+      return series.filter(s => ymOf(s) >= `${year}-01`);
+    }
+    case 'MAX':
+    default: return series;
+  }
+}
+
 window.Fin = {
   fmtILS, fmtUSD, fmtPct, fmtSigned, fmtMonth,
   toILS, ALL_MONTHS, LATEST, last12, last24,
@@ -279,4 +300,5 @@ window.Fin = {
   GROUP_COLOR, CATEGORY_COLOR, INCOME_TYPE_COLOR,
   PRETTY_TYPE, PRETTY_CAT,
   rebuildDerivations,
+  sliceByRange, RANGE_OPTIONS,
 };

@@ -12,6 +12,7 @@ function KPICard({ label, value, sub, trend }) {
 }
 
 function NetWorthChart({ ownerFilter }) {
+  const [range, setRange] = useStateOv('1Y');
   const accFilter = ownerFilter === 'both' ? () => true : (a) => a.owner === ownerFilter;
   const accs = window.FinanceData.ACCOUNTS.filter(accFilter);
   const series = Fin.netWorthSeries(Fin.ALL_MONTHS, accFilter);
@@ -23,24 +24,30 @@ function NetWorthChart({ ownerFilter }) {
       .sort((a, b) => b.value - a.value);
     return { ym: s.ym, value: s.value, parts };
   });
+  const sliced = Fin.sliceByRange(breakdown, range);
   return (
-    <LineChart
-      data={breakdown}
-      height={260}
-      formatY={(v) => Fin.fmtILS(v, { compact: true })}
-      tooltipExtra={(d) => (
-        <div className="tt-breakdown">
-          {d.parts.slice(0, 6).map(p => (
-            <div key={p.acc.id} className="tt-row">
-              <Icon name={ACC_TYPE_ICON[p.acc.type]} size={11}/>
-              <span className="tt-key">{p.acc.name} <span className="muted">{p.acc.owner}</span></span>
-              <span className="tt-val">{Fin.fmtILS(p.value, { compact: true })}</span>
-            </div>
-          ))}
-          {d.parts.length > 6 && <div className="tt-row muted">+ {d.parts.length - 6} more</div>}
-        </div>
-      )}
-    />
+    <>
+      <div className="chart-controls">
+        <TimeRangeFilter value={range} onChange={setRange}/>
+      </div>
+      <LineChart
+        data={sliced}
+        height={260}
+        formatY={(v) => Fin.fmtILS(v, { compact: true })}
+        tooltipExtra={(d) => (
+          <div className="tt-breakdown">
+            {d.parts.slice(0, 6).map(p => (
+              <div key={p.acc.id} className="tt-row">
+                <Icon name={ACC_TYPE_ICON[p.acc.type]} size={11}/>
+                <span className="tt-key">{p.acc.name} <span className="muted">{p.acc.owner}</span></span>
+                <span className="tt-val">{Fin.fmtILS(p.value, { compact: true })}</span>
+              </div>
+            ))}
+            {d.parts.length > 6 && <div className="tt-row muted">+ {d.parts.length - 6} more</div>}
+          </div>
+        )}
+      />
+    </>
   );
 }
 

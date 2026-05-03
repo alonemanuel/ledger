@@ -40,7 +40,9 @@ function AccountRow({ acc, onOpen, primaryCurrency }) {
 }
 
 function AccountDetail({ acc, onClose }) {
+  const [range, setRange] = useStateAcc('1Y');
   const series = Fin.accountSeries(acc.id);
+  const sliced = Fin.sliceByRange(series, range);
   const idx = ACCS_ACC.findIndex(a => a.id === acc.id);
   const serial = idx >= 0 ? String(idx + 1).padStart(3, '0') : '—';
   return (
@@ -54,8 +56,11 @@ function AccountDetail({ acc, onClose }) {
         </div>
       </header>
       <section className="panel">
-        <header className="panel-h"><h3>Balance history</h3></header>
-        <LineChart data={series} height={280} formatY={(v) => Fin.fmtILS(v, { compact: true })}/>
+        <header className="panel-h">
+          <h3>Balance history</h3>
+          <TimeRangeFilter value={range} onChange={setRange}/>
+        </header>
+        <LineChart data={sliced} height={280} formatY={(v) => Fin.fmtILS(v, { compact: true })}/>
       </section>
       <section className="panel">
         <header className="panel-h"><h3>Snapshots</h3><span className="panel-sub">monthly</span></header>

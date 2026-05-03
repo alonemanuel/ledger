@@ -556,3 +556,16 @@ body {
   margin-bottom: 8px;
   word-break: break-word;
 }
+
+/* Time-range filter wrapper for charts */
+.chart-controls {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+.seg.time-range button {
+  padding: 4px 10px;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
