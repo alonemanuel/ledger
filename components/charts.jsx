@@ -1,6 +1,21 @@
 // Hand-rolled SVG chart primitives for the dashboard.
 const { useState, useMemo, useRef, useEffect } = React;
 
+// ── TIME RANGE FILTER ──────────────────────────────────────────────────────
+function TimeRangeFilter({ value, onChange, options = Fin.RANGE_OPTIONS }) {
+  return (
+    <div className="seg time-range">
+      {options.map(opt => (
+        <button
+          key={opt}
+          className={value === opt ? 'on' : ''}
+          onClick={() => onChange(opt)}
+        >{opt}</button>
+      ))}
+    </div>
+  );
+}
+
 // ── LINE / AREA CHART ──────────────────────────────────────────────────────
 function LineChart({ data, height = 220, color = 'var(--accent)', fill = true, padding = { l: 56, r: 16, t: 16, b: 28 }, yTicks = 4, onHover, formatY, tooltipExtra }) {
   const wrapRef = useRef(null);
