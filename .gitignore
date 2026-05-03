@@ -1,0 +1,17 @@
+# Private data (never commit)
+data/data.js
+
+# Built artifacts
+dist/
+*.private/
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Editor
+.idea/
+.vscode/
+*.swp
