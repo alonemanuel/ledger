@@ -35,7 +35,7 @@ function CashflowTab() {
   });
   const allExpKeys = [...expCats, 'uncategorized'];
 
-  // last 3 months treemap
+  // last 3 months — categories treemap (squarified, area ∝ amount)
   const last3 = Fin.ALL_MONTHS.slice(-3);
   const cat3 = {};
   window.FinanceData.EXPENSES
@@ -112,7 +112,7 @@ function CashflowTab() {
 
       <section className="panel">
         <header className="panel-h"><h3>Last 3 months — categories</h3><span className="panel-sub">{Fin.fmtMonth(last3[0])} → {Fin.fmtMonth(last3[2])}</span></header>
-        <Treemap items={treemapItems} width={1100} height={260}/>
+        <Treemap items={treemapItems} height={320}/>
       </section>
 
       <section className="panel">

@@ -105,7 +105,17 @@ function App() {
           <span className="brand-name">Ledger</span>
           <span className="brand-sub">Alon &amp; Amit · personal finance</span>
         </div>
-        <FxStrip rate={manualRate} manualOpen={manualOpen} setManualOpen={setManualOpen} manualRate={manualRate} setManualRate={setManualRate}/>
+        <div className="header-actions">
+          <button
+            className="theme-toggle"
+            onClick={() => setTweak('dark', !t.dark)}
+            aria-label={t.dark ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={t.dark ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            <Icon name={t.dark ? 'sun' : 'moon'} size={16}/>
+          </button>
+          <FxStrip rate={manualRate} manualOpen={manualOpen} setManualOpen={setManualOpen} manualRate={manualRate} setManualRate={setManualRate}/>
+        </div>
         <nav className="app-nav">
           {tabs.map(tt => (
             <button key={tt.id} data-screen-label={tt.label} className={tab === tt.id ? 'on' : ''} onClick={() => setTab(tt.id)}>{tt.label}</button>
@@ -194,6 +204,15 @@ function Bootstrap() {
               Read-only access to your Drive folder.<br/>
               Tokens stay in your browser; nothing is sent anywhere else.
             </div>
+            <button className="boot-btn boot-btn-ghost" onClick={async () => {
+              setError(null); setPhase('fetching');
+              try {
+                await window.DriveLoader.loadDemoData();
+                setTick(x => x + 1); setPhase('ready');
+              } catch (e) {
+                setError(e.message || String(e)); setPhase('error');
+              }
+            }}>Load demo data</button>
           </>
         )}
 

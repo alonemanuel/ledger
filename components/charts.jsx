@@ -286,49 +286,127 @@ function Sparkline({ values, w = 100, h = 26, color = 'currentColor' }) {
   );
 }
 
-// ── TREEMAP (squarified-ish, simple slice-and-dice) ────────────────────────
-function Treemap({ items, width = 600, height = 260 }) {
-  const total = items.reduce((s, i) => s + i.value, 0) || 1;
-  // simple slice-and-dice alternating
+// ── SQUARIFIED TREEMAP (Bruls/Huijin/van Wijk — keeps rects close to square) ─
+function squarify(items, x0, y0, x1, y1) {
   const layout = [];
-  let x = 0, y = 0, w = width, h = height;
-  let horizontal = w > h;
   let remaining = items.slice().sort((a, b) => b.value - a.value);
-  let remainTotal = total;
-  while (remaining.length) {
-    const it = remaining.shift();
-    const frac = it.value / remainTotal;
-    if (horizontal) {
-      const ww = w * frac;
-      layout.push({ ...it, x, y, w: ww, h });
-      x += ww; w -= ww;
-    } else {
-      const hh = h * frac;
-      layout.push({ ...it, x, y, w, h: hh });
-      y += hh; h -= hh;
+  let rect = { x0, y0, x1, y1 };
+
+  const worst = (row, side, scale) => {
+    if (row.length === 0) return Infinity;
+    let sum = 0, max = 0, min = Infinity;
+    for (const it of row) {
+      const a = it.value * scale;
+      sum += a;
+      if (a > max) max = a;
+      if (a < min) min = a;
     }
-    horizontal = !horizontal;
-    remainTotal -= it.value;
+    return Math.max((side * side * max) / (sum * sum), (sum * sum) / (side * side * min));
+  };
+
+  while (remaining.length) {
+    const w = rect.x1 - rect.x0, h = rect.y1 - rect.y0;
+    const side = Math.min(w, h);
+    const remainArea = w * h;
+    const remainTotal = remaining.reduce((s, i) => s + i.value, 0) || 1;
+    const scale = remainArea / remainTotal;
+
+    // Grow row while aspect ratios improve.
+    let row = [];
+    let i = 0;
+    while (i < remaining.length) {
+      const candidate = [...row, remaining[i]];
+      if (row.length && worst(candidate, side, scale) > worst(row, side, scale)) break;
+      row = candidate;
+      i++;
+    }
+
+    // Lay out row along the shorter side.
+    const rowSum = row.reduce((s, it) => s + it.value, 0);
+    const rowArea = rowSum * scale;
+    if (w >= h) {
+      const colW = rowArea / h;
+      let yc = rect.y0;
+      for (const it of row) {
+        const ih = (it.value * scale) / colW;
+        layout.push({ ...it, x: rect.x0, y: yc, w: colW, h: ih });
+        yc += ih;
+      }
+      rect = { x0: rect.x0 + colW, y0: rect.y0, x1: rect.x1, y1: rect.y1 };
+    } else {
+      const rowH = rowArea / w;
+      let xc = rect.x0;
+      for (const it of row) {
+        const iw = (it.value * scale) / rowH;
+        layout.push({ ...it, x: xc, y: rect.y0, w: iw, h: rowH });
+        xc += iw;
+      }
+      rect = { x0: rect.x0, y0: rect.y0 + rowH, x1: rect.x1, y1: rect.y1 };
+    }
+    remaining = remaining.slice(row.length);
   }
+  return layout;
+}
+
+function Treemap({ items, height = 320 }) {
+  const wrapRef = useRef(null);
+  const [w, setW] = useState(800);
+  const [hover, setHover] = useState(null);
+  useEffect(() => {
+    if (!wrapRef.current) return;
+    const ro = new ResizeObserver((entries) => { for (const e of entries) setW(Math.max(320, e.contentRect.width)); });
+    ro.observe(wrapRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  const layout = useMemo(() => squarify(items, 0, 0, w, height), [items, w, height]);
+  const total = items.reduce((s, i) => s + i.value, 0) || 1;
+
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="treemap" preserveAspectRatio="none">
-      {layout.map((it, i) => (
-        <g key={i}>
-          <rect x={it.x} y={it.y} width={it.w} height={it.h} fill={it.color} stroke="var(--bg)" strokeWidth="1"/>
-          {it.w > 56 && it.h > 28 && (
-            <>
-              {it.icon && it.w > 80 && it.h > 50 && (
-                <foreignObject x={it.x + 8} y={it.y + 8} width="16" height="16">
-                  <Icon name={it.icon} size={14} color="var(--bg)"/>
-                </foreignObject>
+    <div ref={wrapRef} className="chart-wrap treemap-wrap">
+      <svg width={w} height={height} viewBox={`0 0 ${w} ${height}`} className="treemap">
+        {layout.map((it, i) => {
+          const big = it.w > 80 && it.h > 50;
+          const showLabel = it.w > 56 && it.h > 28;
+          const dim = hover != null && hover !== i;
+          return (
+            <g key={i}
+               onMouseEnter={() => setHover(i)}
+               onMouseLeave={() => setHover(null)}
+               style={{ cursor: 'pointer', transition: 'opacity .12s' }}
+               opacity={dim ? 0.4 : 1}>
+              <rect x={it.x} y={it.y} width={it.w} height={it.h}
+                    fill={it.color}
+                    stroke={hover === i ? 'var(--ink)' : 'var(--bg)'}
+                    strokeWidth={hover === i ? 1.5 : 1}/>
+              {showLabel && (
+                <>
+                  {it.icon && big && (
+                    <foreignObject x={it.x + 8} y={it.y + 8} width="16" height="16">
+                      <Icon name={it.icon} size={14} color="var(--bg)"/>
+                    </foreignObject>
+                  )}
+                  <text x={it.x + 8} y={it.y + (big ? 38 : 18)} className="tm-label">{it.label}</text>
+                  <text x={it.x + 8} y={it.y + (big ? 54 : 34)} className="tm-value">{Fin.fmtILS(it.value, { compact: true })}</text>
+                </>
               )}
-              <text x={it.x + 8} y={it.y + (it.icon && it.w > 80 && it.h > 50 ? 38 : 18)} className="tm-label">{it.label}</text>
-              <text x={it.x + 8} y={it.y + (it.icon && it.w > 80 && it.h > 50 ? 54 : 34)} className="tm-value">{Fin.fmtILS(it.value, { compact: true })}</text>
-            </>
-          )}
-        </g>
-      ))}
-    </svg>
+            </g>
+          );
+        })}
+      </svg>
+      {hover != null && layout[hover] && (() => {
+        const it = layout[hover];
+        const tipX = Math.min(w - 220, it.x + it.w + 8);
+        const tipY = Math.max(0, Math.min(height - 80, it.y));
+        return (
+          <div className="chart-tooltip" style={{ left: tipX, top: tipY }}>
+            <div className="tt-label">{it.label}</div>
+            <div className="tt-value">{Fin.fmtILS(it.value)}</div>
+            <div className="tt-sub">{Fin.fmtPct(it.value / total)} of total</div>
+          </div>
+        );
+      })()}
+    </div>
   );
 }
 
