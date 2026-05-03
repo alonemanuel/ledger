@@ -30,6 +30,8 @@ const ICON_PATHS = {
   pieChart:    <><path d="M12 3v9h9"/><circle cx="12" cy="12" r="9"/></>,
   clock:       <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
   bolt:        <><path d="M13 3 5 14h6l-1 7 8-11h-6l1-7z"/></>,
+  sun:         <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></>,
+  moon:        <><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></>,
 };
 
 function Icon({ name, size = 16, color = 'currentColor', strokeWidth = 1.6, style }) {

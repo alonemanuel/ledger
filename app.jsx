@@ -93,7 +93,17 @@ function App() {
           <span className="brand-name">Ledger</span>
           <span className="brand-sub">Alon &amp; Amit · personal finance</span>
         </div>
-        <FxStrip rate={manualRate} manualOpen={manualOpen} setManualOpen={setManualOpen} manualRate={manualRate} setManualRate={setManualRate}/>
+        <div className="header-actions">
+          <button
+            className="theme-toggle"
+            onClick={() => setTweak('dark', !t.dark)}
+            aria-label={t.dark ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={t.dark ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            <Icon name={t.dark ? 'sun' : 'moon'} size={16}/>
+          </button>
+          <FxStrip rate={manualRate} manualOpen={manualOpen} setManualOpen={setManualOpen} manualRate={manualRate} setManualRate={setManualRate}/>
+        </div>
         <nav className="app-nav">
           {tabs.map(tt => (
             <button key={tt.id} data-screen-label={tt.label} className={tab === tt.id ? 'on' : ''} onClick={() => setTab(tt.id)}>{tt.label}</button>
