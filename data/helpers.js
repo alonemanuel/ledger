@@ -268,20 +268,6 @@ const PRETTY_CAT = {
   other: 'Other', uncategorized: 'Uncategorized',
 };
 
-window.Fin = {
-  fmtILS, fmtUSD, fmtPct, fmtSigned, fmtMonth,
-  toILS, ALL_MONTHS, LATEST, last12, last24,
-  accountById, balanceILS, netWorthAt, netWorthSeries,
-  incomeInMonth, incomeByTypeMonth, expenseInMonth, expenseByCategoryMonth,
-  passiveInMonth, PASSIVE_TYPES,
-  groupedAssets, byOwner, byCurrency,
-  recentActivity, accountSeries, avgBalance, passivePerAccount,
-  GROUP_COLOR, CATEGORY_COLOR, INCOME_TYPE_COLOR,
-  PRETTY_TYPE, PRETTY_CAT,
-  rebuildDerivations,
-  sliceByRange, RANGE_OPTIONS,
-};
-
 // ── TIME RANGE SLICING ─────────────────────────────────────────────────────
 const RANGE_OPTIONS = ['1M', 'MTD', '6M', '1Y', 'YTD', 'MAX'];
 
@@ -303,6 +289,16 @@ function sliceByRange(series, range) {
   }
 }
 
-// re-export now that they're defined
-window.Fin.sliceByRange = sliceByRange;
-window.Fin.RANGE_OPTIONS = RANGE_OPTIONS;
+window.Fin = {
+  fmtILS, fmtUSD, fmtPct, fmtSigned, fmtMonth,
+  toILS, ALL_MONTHS, LATEST, last12, last24,
+  accountById, balanceILS, netWorthAt, netWorthSeries,
+  incomeInMonth, incomeByTypeMonth, expenseInMonth, expenseByCategoryMonth,
+  passiveInMonth, PASSIVE_TYPES,
+  groupedAssets, byOwner, byCurrency,
+  recentActivity, accountSeries, avgBalance, passivePerAccount,
+  GROUP_COLOR, CATEGORY_COLOR, INCOME_TYPE_COLOR,
+  PRETTY_TYPE, PRETTY_CAT,
+  rebuildDerivations,
+  sliceByRange, RANGE_OPTIONS,
+};
