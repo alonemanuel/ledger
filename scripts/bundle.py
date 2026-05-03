@@ -97,6 +97,12 @@ def main():
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w", encoding="utf-8") as f:
         f.write(html)
+
+    # SPA fallback so client-side paths like /cashflow don't 404 on refresh.
+    vercel_json = '{"rewrites":[{"source":"/(.*)","destination":"/"}]}\n'
+    with open(out.parent / "vercel.json", "w", encoding="utf-8") as f:
+        f.write(vercel_json)
+
     print(f"✓ Wrote {out}")
     print(f"  Size: {os.path.getsize(out):,} B")
     print(f"  Mode: {'example (synthetic data)' if USE_EXAMPLE else 'live (Google Drive)'}")

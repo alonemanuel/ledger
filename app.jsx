@@ -49,24 +49,39 @@ function FxStrip({ rate, manualOpen, setManualOpen, manualRate, setManualRate })
   );
 }
 
+const TAB_IDS = ['overview', 'accounts', 'cashflow', 'passive'];
+
+function tabFromUrl() {
+  const seg = location.pathname.replace(/^\/+|\/+$/g, '');
+  if (TAB_IDS.includes(seg)) return seg;
+  // Back-compat for old #tab=foo links
+  const m = location.hash.match(/tab=(overview|accounts|cashflow|passive)/);
+  return m ? m[1] : 'overview';
+}
+
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const [tab, setTab] = useState(() => {
-    const m = location.hash.match(/tab=(overview|accounts|cashflow|passive)/);
-    return m ? m[1] : 'overview';
-  });
+  const [tab, setTab] = useState(tabFromUrl);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualRate, setManualRate] = useState(window.FinanceData.FX.current);
 
   // apply manual rate
   useEffect(() => { window.FinanceData.FX.current = manualRate; }, [manualRate]);
 
-  // persist tab in hash
+  // persist tab in path
   useEffect(() => {
-    const params = new URLSearchParams(location.hash.replace(/^#/, ''));
-    params.set('tab', tab);
-    location.hash = params.toString();
+    const want = tab === 'overview' ? '/' : `/${tab}`;
+    if (location.pathname + location.hash !== want) {
+      history.pushState({ tab }, '', want);
+    }
   }, [tab]);
+
+  // back/forward navigation
+  useEffect(() => {
+    const onPop = () => setTab(tabFromUrl());
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
 
   // theme
   useEffect(() => {
