@@ -364,10 +364,12 @@ body {
 .cat-legend li { grid-template-columns: 10px 14px 1fr; }
 .cat-legend li svg { color: var(--ink-3); }
 
-/* ── Square grid (categories) ─────────────────────────────────────────── */
-.square-grid { display: block; width: 100%; height: auto; }
-.tm-label { font: 11px var(--font-sans); fill: var(--bg); font-weight: 500; }
-.tm-value { font: 12px var(--font-mono); fill: var(--bg); opacity: .85; }
+/* ── Treemap ───────────────────────────────────────────────────────────── */
+.treemap-wrap { width: 100%; }
+.treemap { display: block; width: 100%; height: auto; }
+.tm-label { font: 11px var(--font-sans); fill: var(--bg); font-weight: 500; pointer-events: none; }
+.tm-value { font: 12px var(--font-mono); fill: var(--bg); opacity: .85; pointer-events: none; }
+.tt-sub { font-size: 11px; color: var(--ink-3); margin-top: 3px; }
 
 /* ── Mystery / modal ───────────────────────────────────────────────────── */
 .mystery .panel-h h3 { color: var(--neg); }
