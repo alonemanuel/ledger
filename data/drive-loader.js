@@ -63,23 +63,6 @@
     localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: accessToken, expiresAt }));
   }
 
-  // Attempts to get a fresh token without any user-visible UI.
-  // Succeeds silently when Google session is active and consent was previously granted.
-  async function trySignInSilent() {
-    await ensureGisInited();
-    return new Promise((resolve) => {
-      tokenClient.callback = (response) => {
-        if (response.error || !response.access_token) {
-          resolve(false);
-          return;
-        }
-        saveToken(response);
-        resolve(true);
-      };
-      tokenClient.requestAccessToken({ prompt: '' });
-    });
-  }
-
   async function requestSignIn() {
     await ensureGisInited();
     return new Promise((resolve, reject) => {
@@ -282,13 +265,8 @@
         return await fetchAndPopulate();
       } catch (e) {
         if (e.message !== 'AUTH_EXPIRED') throw e;
-        // token expired — fall through to silent re-auth
       }
     }
-    // Try to get a token silently (no popup) if Google session is still active.
-    const silentOk = await trySignInSilent();
-    if (silentOk) return await fetchAndPopulate();
-    // Silent auth failed — caller should show the sign-in button.
     throw new Error('NEEDS_SIGNIN');
   }
 
@@ -325,7 +303,6 @@
     isSignedIn: () => !!accessToken,
     fetchAndPopulate,
     requestSignIn,
-    trySignInSilent,
     loadCachedToken,
     loadDemoData,
   };
