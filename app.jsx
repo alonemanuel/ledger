@@ -22,7 +22,7 @@ function FxStrip() {
   const [live, setLive] = useState(false);
 
   useEffect(() => {
-    fetch('https://api.frankfurter.app/latest?from=USD&to=ILS')
+    fetch('https://open.er-api.com/v6/latest/USD')
       .then(r => r.json())
       .then(d => {
         const r = d.rates && d.rates.ILS;

@@ -103,7 +103,8 @@
     const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
     if (res.status === 401) { clearCachedToken(); throw new Error('AUTH_EXPIRED'); }
     if (!res.ok) throw new Error(`Drive list failed: ${res.status} ${res.statusText}`);
-    const json = await res.json();
+    let json;
+    try { json = await res.json(); } catch { throw new Error(`Drive API returned unexpected response (status ${res.status})`); }
     return json.files || [];
   }
 
