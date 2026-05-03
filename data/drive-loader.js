@@ -278,6 +278,15 @@
     clearCachedToken();
   }
 
+  async function loadDemoData() {
+    const src = await fetch('data/data.example.js').then(r => r.text());
+    // Run in a local scope so its `const` declarations don't clash with
+    // the already-declared globals from data.js.
+    // data.example.js ends with `window.FinanceData = { ... }` which
+    // correctly writes out the result using its local variables.
+    new Function(src)();
+  }
+
   window.DriveLoader = {
     bootstrap,
     signOut,
@@ -285,5 +294,6 @@
     fetchAndPopulate,
     requestSignIn,
     loadCachedToken,
+    loadDemoData,
   };
 })();
