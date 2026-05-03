@@ -35,7 +35,7 @@ function CashflowTab() {
   });
   const allExpKeys = [...expCats, 'uncategorized'];
 
-  // last 3 months treemap
+  // last 3 months — categories as squares (area ∝ amount)
   const last3 = Fin.ALL_MONTHS.slice(-3);
   const cat3 = {};
   window.FinanceData.EXPENSES
@@ -44,7 +44,7 @@ function CashflowTab() {
       const k = e.category || 'uncategorized';
       cat3[k] = (cat3[k] || 0) + Fin.toILS(e.amount, e.currency, e.ym);
     });
-  const treemapItems = Object.entries(cat3)
+  const squareItems = Object.entries(cat3)
     .sort((a, b) => b[1] - a[1])
     .map(([k, v]) => ({
       label: Fin.PRETTY_CAT[k] || k, value: v,
@@ -112,7 +112,7 @@ function CashflowTab() {
 
       <section className="panel">
         <header className="panel-h"><h3>Last 3 months — categories</h3><span className="panel-sub">{Fin.fmtMonth(last3[0])} → {Fin.fmtMonth(last3[2])}</span></header>
-        <Treemap items={treemapItems} width={1100} height={260}/>
+        <SquareGrid items={squareItems} width={1100} height={260}/>
       </section>
 
       <section className="panel">

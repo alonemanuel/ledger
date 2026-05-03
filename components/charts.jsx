@@ -286,50 +286,54 @@ function Sparkline({ values, w = 100, h = 26, color = 'currentColor' }) {
   );
 }
 
-// ── TREEMAP (squarified-ish, simple slice-and-dice) ────────────────────────
-function Treemap({ items, width = 600, height = 260 }) {
+// ── SQUARE GRID (area ∝ value, so side ∝ √value — easy to compare) ────────
+function SquareGrid({ items, width = 1100, height = 260, gap = 2 }) {
   const total = items.reduce((s, i) => s + i.value, 0) || 1;
-  // simple slice-and-dice alternating
+  const sorted = items.slice().sort((a, b) => b.value - a.value);
+
+  // Pick a scale so total square area ≈ width × height × packing.
+  // side_i = √value_i × scale  ⇒  Σ side_i² = total × scale².
+  const packing = 0.78;
+  const scale = Math.sqrt((width * height * packing) / total);
+
+  const squares = sorted.map(it => ({ ...it, side: Math.max(8, Math.sqrt(it.value) * scale) }));
+
+  // Greedy row packing: largest first, wrap on overflow.
   const layout = [];
-  let x = 0, y = 0, w = width, h = height;
-  let horizontal = w > h;
-  let remaining = items.slice().sort((a, b) => b.value - a.value);
-  let remainTotal = total;
-  while (remaining.length) {
-    const it = remaining.shift();
-    const frac = it.value / remainTotal;
-    if (horizontal) {
-      const ww = w * frac;
-      layout.push({ ...it, x, y, w: ww, h });
-      x += ww; w -= ww;
-    } else {
-      const hh = h * frac;
-      layout.push({ ...it, x, y, w, h: hh });
-      y += hh; h -= hh;
-    }
-    horizontal = !horizontal;
-    remainTotal -= it.value;
+  let x = 0, y = 0, rowH = 0;
+  for (const sq of squares) {
+    if (x > 0 && x + sq.side > width) { x = 0; y += rowH + gap; rowH = 0; }
+    layout.push({ ...sq, x, y });
+    x += sq.side + gap;
+    rowH = Math.max(rowH, sq.side);
   }
+  const totalH = y + rowH;
+
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="treemap" preserveAspectRatio="none">
-      {layout.map((it, i) => (
-        <g key={i}>
-          <rect x={it.x} y={it.y} width={it.w} height={it.h} fill={it.color} stroke="var(--bg)" strokeWidth="1"/>
-          {it.w > 56 && it.h > 28 && (
-            <>
-              {it.icon && it.w > 80 && it.h > 50 && (
-                <foreignObject x={it.x + 8} y={it.y + 8} width="16" height="16">
-                  <Icon name={it.icon} size={14} color="var(--bg)"/>
-                </foreignObject>
-              )}
-              <text x={it.x + 8} y={it.y + (it.icon && it.w > 80 && it.h > 50 ? 38 : 18)} className="tm-label">{it.label}</text>
-              <text x={it.x + 8} y={it.y + (it.icon && it.w > 80 && it.h > 50 ? 54 : 34)} className="tm-value">{Fin.fmtILS(it.value, { compact: true })}</text>
-            </>
-          )}
-        </g>
-      ))}
+    <svg width={width} height={totalH} viewBox={`0 0 ${width} ${totalH}`} className="square-grid">
+      {layout.map((sq, i) => {
+        const big = sq.side > 70;
+        const showLabel = sq.side > 56;
+        const showIcon = sq.icon && sq.side > 50;
+        return (
+          <g key={i}>
+            <rect x={sq.x} y={sq.y} width={sq.side} height={sq.side} fill={sq.color} stroke="var(--bg)" strokeWidth="1"/>
+            {showIcon && (
+              <foreignObject x={sq.x + 8} y={sq.y + 8} width="16" height="16">
+                <Icon name={sq.icon} size={14} color="var(--bg)"/>
+              </foreignObject>
+            )}
+            {showLabel && (
+              <>
+                <text x={sq.x + 8} y={sq.y + (big ? 38 : 22)} className="tm-label">{sq.label}</text>
+                <text x={sq.x + 8} y={sq.y + (big ? 54 : 38)} className="tm-value">{Fin.fmtILS(sq.value, { compact: true })}</text>
+              </>
+            )}
+          </g>
+        );
+      })}
     </svg>
   );
 }
 
-Object.assign(window, { LineChart, StackedBar, PairedBars, Donut, Sparkline, Treemap });
+Object.assign(window, { LineChart, StackedBar, PairedBars, Donut, Sparkline, SquareGrid });
