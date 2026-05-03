@@ -162,8 +162,7 @@ function Bootstrap() {
   const [tick, setTick] = useState(0);
 
   const start = async () => {
-    setError(null);
-    setPhase('fetching');
+    setError(null); setPhase('loading');
     try {
       await window.DriveLoader.bootstrap();
       setTick(x => x + 1); setPhase('ready');
