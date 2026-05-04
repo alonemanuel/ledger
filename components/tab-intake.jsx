@@ -36,25 +36,25 @@ async function fileToPayload(file) {
   const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1) : '';
   const type = file.type || '';
 
+  const fileName = file.name || null;
   if (type.startsWith('image/') || ['png','jpg','jpeg','gif','webp'].includes(ext)) {
     const content = await readFileAsBase64(file);
-    return { kind: 'image', mediaType: type || `image/${ext === 'jpg' ? 'jpeg' : ext}`, content };
+    return { kind: 'image', mediaType: type || `image/${ext === 'jpg' ? 'jpeg' : ext}`, content, fileName };
   }
   if (type === 'application/pdf' || ext === 'pdf') {
     const content = await readFileAsBase64(file);
-    return { kind: 'pdf', content };
+    return { kind: 'pdf', content, fileName };
   }
   if (ext === 'xlsx' || type.includes('spreadsheetml')) {
     if (!window.XLSX) throw new Error('XLSX parser not loaded');
     const buf = await file.arrayBuffer();
-    const wb = window.XLSX.read(buf, { type: 'array' });
-    // First sheet only for v1.
+    const wb = window.XLSX.read(buf, { type: 'array', cellDates: true });
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const csv = window.XLSX.utils.sheet_to_csv(ws);
+    const csv = window.XLSX.utils.sheet_to_csv(ws, { dateNF: 'yyyy-mm-dd' });
     if (csv.split('\n').length > MAX_CSV_ROWS + 1) {
       throw new Error(`XLSX has more than ${MAX_CSV_ROWS} rows; please trim before uploading.`);
     }
-    return { kind: 'text', content: csv };
+    return { kind: 'text', content: csv, fileName };
   }
   // Default: treat as text/CSV.
   const text = await readFileAsText(file);
@@ -64,7 +64,7 @@ async function fileToPayload(file) {
   if (text.split('\n').length > MAX_CSV_ROWS + 1 && (ext === 'csv' || type === 'text/csv')) {
     throw new Error(`CSV has more than ${MAX_CSV_ROWS} rows; please trim before uploading.`);
   }
-  return { kind: 'text', content: text };
+  return { kind: 'text', content: text, fileName };
 }
 
 async function pasteToPayload(text) {
@@ -74,17 +74,22 @@ async function pasteToPayload(text) {
 }
 
 async function postIntake(payload) {
+  const loader = window.DbLoader || window.SheetsLoader;
+  const token = loader?.getCurrentToken?.() || null;
   const sheetId = window.SheetsLoader?.getSheetId?.() || null;
   const schema  = window.SheetsLoader?.getSchemaSnapshot?.() || null;
   const accounts = (window.FinanceData?.ACCOUNTS || []).map(a => ({
     id: a.id, nickname: a.name, type: a.type, currency: a.currency,
   }));
   const categories = window.FinanceData?.CATEGORIES || [];
-  const googleToken = window.SheetsLoader?.getCurrentToken?.() || null;
+  const sourceDoc = payload.fileName || (payload.kind === 'text' ? 'user prompt' : payload.kind);
   const res = await fetch('/api/intake', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...payload, sheetId, schema, accounts, categories, googleToken }),
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ ...payload, sheetId, schema, accounts, categories, sourceDoc }),
   });
   if (!res.ok) {
     const text = await res.text();
@@ -93,14 +98,40 @@ async function postIntake(payload) {
   return await res.json();
 }
 
+// Map API response fields → Google Sheet column names. The Sheet has legacy
+// headers (amount_native, currency, amount_ils, fx_rate) while the API now
+// returns richer fields (purchase_amount, purchase_currency, charge_amount_ils).
+function mapExpenseToSheetRow(row) {
+  const pa = parseFloat(row.purchase_amount) || 0;
+  const ca = parseFloat(row.charge_amount_ils) || pa;
+  const pc = row.purchase_currency || 'ILS';
+  const fxRate = (pc !== 'ILS' && pa > 0) ? +(ca / pa).toFixed(4) : 1;
+  return {
+    date: row.date,
+    account_id: row.account_id,
+    amount_native: pa,
+    currency: pc,
+    amount_ils: ca,
+    fx_rate: fxRate,
+    category: row.category || '',
+    subcategory: '',
+    merchant: row.merchant || '',
+    description: row.description || '',
+    source_doc: row.source_doc || '',
+    billing_date: row.billing_date || '',
+    external_ref_id: row.external_ref_id || '',
+    created_at: row.created_at || '',
+  };
+}
+
 async function applyExtraction(extracted) {
-  // extracted: { snapshots: [], income: [], expenses: [] }
   const counts = { snapshots: 0, income: 0, expenses: 0 };
   const errors = [];
+  const expenseRows = (extracted.expenses || []).map(mapExpenseToSheetRow);
   const tabRows = [
     ['snapshots', extracted.snapshots],
     ['income',    extracted.income],
-    ['expenses',  extracted.expenses],
+    ['expenses',  expenseRows],
   ];
   for (const [tab, rows] of tabRows) {
     if (!Array.isArray(rows) || !rows.length) continue;
@@ -114,24 +145,39 @@ async function applyExtraction(extracted) {
   return { counts, errors };
 }
 
-function summarizeCounts(counts) {
+function summarizeCounts(counts, rejected) {
   const parts = [];
   if (counts.expenses)  parts.push(`${counts.expenses} expense${counts.expenses === 1 ? '' : 's'}`);
   if (counts.income)    parts.push(`${counts.income} income`);
   if (counts.snapshots) parts.push(`${counts.snapshots} snapshot${counts.snapshots === 1 ? '' : 's'}`);
-  if (!parts.length) return 'No rows extracted.';
-  return `Added ${parts.join(', ')}.`;
+  const rejCount = Array.isArray(rejected) ? rejected.length : 0;
+  if (parts.length) {
+    return `Added ${parts.join(', ')}.${rejCount ? ` (${rejCount} skipped — see console.)` : ''}`;
+  }
+  if (rejCount) {
+    return `No rows added — ${rejCount} skipped. ${rejected[0].reason}.`;
+  }
+  return 'No rows extracted. The model skips entries where the account is ambiguous — try naming the account (e.g. "alon\'s checking") or being more explicit.';
 }
 
 function IntakeTab({ onIngested }) {
-  const { useState, useRef } = React;
+  const { useState, useRef, useEffect } = React;
   const [text, setText] = useState('');
   const [status, setStatus] = useState(null);   // { kind: 'busy'|'ok'|'err', msg }
   const [drop, setDrop] = useState(false);
   const [stubBanner, setStubBanner] = useState(false);
+  const [busyStartedAt, setBusyStartedAt] = useState(null);
+  const [now, setNow] = useState(Date.now());
   const fileInputRef = useRef(null);
 
-  const noLoader = !window.SheetsLoader;
+  // Tick once a second while busy so the elapsed-time display updates.
+  useEffect(() => {
+    if (!busyStartedAt) return;
+    const id = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(id);
+  }, [busyStartedAt]);
+
+  const noLoader = !window.DbLoader && !window.SheetsLoader;
 
   if (noLoader) {
     return (
@@ -145,21 +191,39 @@ function IntakeTab({ onIngested }) {
   }
 
   const submit = async (payload) => {
-    setStatus({ kind: 'busy', msg: 'Extracting…' });
+    const sizeKb = Math.round((payload.content?.length || 0) / 1024);
+    setStatus({ kind: 'busy', msg: `Sending ${sizeKb} KB ${payload.kind} to model…` });
     setStubBanner(false);
+    setBusyStartedAt(Date.now());
     try {
       const extracted = await postIntake(payload);
       if (extracted.stub) setStubBanner(true);
       const { counts, errors } = await applyExtraction(extracted);
       // Refresh local FinanceData so other tabs reflect the new rows.
-      try { await window.SheetsLoader.fetchAndPopulate(); } catch (_) { /* ignore */ }
-      const msg = summarizeCounts(counts) + (errors.length ? ` Errors: ${errors.join('; ')}` : '');
-      setStatus({ kind: errors.length ? 'err' : 'ok', msg });
+      const refreshLoader = window.DbLoader || window.SheetsLoader;
+      try { await refreshLoader.fetchAndPopulate(); } catch (_) { /* ignore */ }
+      if (extracted.rejected?.length) {
+        console.warn('[intake] rejected rows:', extracted.rejected);
+      }
+      console.log('[intake] response:', {
+        model: extracted.model, attempts: extracted.attempts, total_ms: extracted.total_ms,
+        finish_reason: extracted.finish_reason, truncated: extracted.truncated, usage: extracted.usage,
+        counts, rejected: extracted.rejected?.length || 0,
+      });
+      let msg = summarizeCounts(counts, extracted.rejected);
+      if (extracted.truncated) {
+        msg += ` ⚠ Output truncated (finish=${extracted.finish_reason}) — likely missed rows. Try a smaller chunk.`;
+      }
+      if (errors.length) msg += ` Errors: ${errors.join('; ')}`;
+      const meta = extracted.model ? ` · ${extracted.model}, ${Math.round((extracted.total_ms || 0) / 100) / 10}s` : '';
+      setStatus({ kind: (errors.length || extracted.truncated) ? 'err' : 'ok', msg: msg + meta });
       if (!errors.length && (counts.expenses || counts.income || counts.snapshots) && onIngested) {
         onIngested();
       }
     } catch (e) {
       setStatus({ kind: 'err', msg: e.message || String(e) });
+    } finally {
+      setBusyStartedAt(null);
     }
   };
 
@@ -256,6 +320,12 @@ function IntakeTab({ onIngested }) {
       {status && (
         <div className={`intake-status intake-status-${status.kind}`}>
           {status.msg}
+          {busy && busyStartedAt && (
+            <span className="intake-status-elapsed">
+              {' '}· {((now - busyStartedAt) / 1000).toFixed(1)}s elapsed
+              {(now - busyStartedAt) > 8000 && ' (Gemini retries can take ~10s under load)'}
+            </span>
+          )}
         </div>
       )}
     </div>

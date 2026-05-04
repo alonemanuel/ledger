@@ -84,6 +84,7 @@ function CashflowTab() {
     .sort((a, b) => {
       const sign = expSort.dir === 'asc' ? 1 : -1;
       if (expSort.col === 'date') return sign * a.date.localeCompare(b.date);
+      if (expSort.col === 'created_at') return sign * (a.created_at || '').localeCompare(b.created_at || '');
       return sign * (Fin.toILS(a.amount, a.currency, a.ym) - Fin.toILS(b.amount, b.currency, b.ym));
     });
 
@@ -181,6 +182,7 @@ function CashflowTab() {
 
       <section className="panel">
         <header className="panel-h"><h3>Expenses</h3><span className="panel-sub">{sortedExpenses.length} transactions · {windowMonths}m</span></header>
+        <div style={{ overflowX: 'auto' }}>
         <table className="data-tbl compact">
           <thead>
             <tr>
@@ -188,7 +190,10 @@ function CashflowTab() {
               <th>Merchant</th>
               <th>Category</th>
               <th>Owner</th>
-              <th className="r sortable" onClick={() => toggleSort('amount')}>Amount{sortArrow('amount')}</th>
+              <th className="r sortable" onClick={() => toggleSort('amount')}>Charge ₪{sortArrow('amount')}</th>
+              <th className="r">Purchase</th>
+              <th>Ref</th>
+              <th className="sortable" onClick={() => toggleSort('created_at')}>Added{sortArrow('created_at')}</th>
             </tr>
           </thead>
           <tbody>
@@ -204,10 +209,14 @@ function CashflowTab() {
                 </td>
                 <td>{e.owner}</td>
                 <td className="r mono private">{Fin.fmtILS(e.amount)}</td>
+                <td className="r mono private">{e.purchase_currency !== 'ILS' ? `${e.purchase_amount} ${e.purchase_currency}` : ''}</td>
+                <td className="mono dim">{e.external_ref_id || ''}</td>
+                <td className="mono dim">{e.created_at ? e.created_at.slice(0, 10) : ''}</td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
       </section>
 
       {mystery.length > 0 && (
