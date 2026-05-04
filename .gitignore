@@ -26,3 +26,10 @@ node_modules/
 .worktrees/
 probe-out/
 
+.vercel
+
+# Environment files (never commit — contain API keys)
+.env
+.env.local
+.env.*.local
+

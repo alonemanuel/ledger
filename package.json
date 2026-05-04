@@ -11,8 +11,7 @@
     "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.71.0",
-    "@vercel/node": "^3.2.0"
+    "@anthropic-ai/sdk": "^0.71.0"
   },
   "devDependencies": {
     "playwright": "^1.49.0"
