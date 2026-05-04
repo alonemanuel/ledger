@@ -120,6 +120,14 @@ function App() {
         <div className="header-actions">
           <button
             className="theme-toggle"
+            onClick={() => setTweak('privacy', !t.privacy)}
+            aria-label={t.privacy ? 'Show amounts' : 'Hide amounts'}
+            title={t.privacy ? 'Show amounts' : 'Hide amounts (privacy mode)'}
+          >
+            <Icon name={t.privacy ? 'eyeOff' : 'eye'} size={16}/>
+          </button>
+          <button
+            className="theme-toggle"
             onClick={() => setTweak('dark', !t.dark)}
             aria-label={t.dark ? 'Switch to light mode' : 'Switch to dark mode'}
             title={t.dark ? 'Switch to light mode' : 'Switch to dark mode'}

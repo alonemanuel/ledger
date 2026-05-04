@@ -32,6 +32,8 @@ const ICON_PATHS = {
   bolt:        <><path d="M13 3 5 14h6l-1 7 8-11h-6l1-7z"/></>,
   sun:         <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></>,
   moon:        <><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></>,
+  eye:         <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></>,
+  eyeOff:      <><path d="M3 3l18 18"/><path d="M10.6 6.2A10 10 0 0 1 12 6c6.5 0 10 6 10 6a16 16 0 0 1-3.5 4.2"/><path d="M6.5 7.5A16 16 0 0 0 2 12s3.5 7 10 7a10 10 0 0 0 4.5-1.1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></>,
 };
 
 function Icon({ name, size = 16, color = 'currentColor', strokeWidth = 1.6, style }) {

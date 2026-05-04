@@ -21,7 +21,7 @@ function AccountRow({ acc, onOpen, primaryCurrency }) {
         <span className="acc-meta">{acc.provider} · {acc.owner} · {acc.currency}</span>
       </span>
       <span className="acc-spark"><Sparkline values={series} w={120} h={28}/></span>
-      <span className="acc-bal">
+      <span className="acc-bal private">
         {showUSDFirst ? (
           <>
             <span className="acc-bal-primary">{Fin.fmtUSD(native)}</span>
@@ -75,10 +75,10 @@ function AccountDetail({ acc, onClose }) {
               return (
                 <tr key={s.ym}>
                   <td>{Fin.fmtMonth(s.ym)}</td>
-                  <td className="r mono">{acc.currency === 'USD' ? Fin.fmtUSD(s.native) : Fin.fmtILS(s.native)}</td>
-                  <td className="r mono">{Fin.fmtILS(s.value)}</td>
+                  <td className="r mono private">{acc.currency === 'USD' ? Fin.fmtUSD(s.native) : Fin.fmtILS(s.native)}</td>
+                  <td className="r mono private">{Fin.fmtILS(s.value)}</td>
                   <td className="r mono">{acc.currency === 'USD' ? window.FinanceData.FX.rateFor(s.ym).toFixed(4) : '—'}</td>
-                  <td className={`r mono ${delta >= 0 ? 'pos' : 'neg'}`}>{next ? Fin.fmtSigned(delta, (v) => Fin.fmtILS(v, { compact: true })) : '—'}</td>
+                  <td className={`r mono private ${delta >= 0 ? 'pos' : 'neg'}`}>{next ? Fin.fmtSigned(delta, (v) => Fin.fmtILS(v, { compact: true })) : '—'}</td>
                 </tr>
               );
             })}
@@ -136,7 +136,7 @@ function AccountsTab({ primaryCurrency, openAccountId, onOpenAccount, onCloseAcc
           <span>Detail groups</span>
         </label>
         <span className="toolbar-spacer"></span>
-        <span className="total-pill">Σ {Fin.fmtILS(totalNW)}</span>
+        <span className="total-pill">Σ <span className="private">{Fin.fmtILS(totalNW)}</span></span>
       </div>
 
       {Object.entries(groups).map(([g, accs]) => {
@@ -145,7 +145,7 @@ function AccountsTab({ primaryCurrency, openAccountId, onOpenAccount, onCloseAcc
           <section key={g} className="panel acc-group">
             <header className="panel-h">
               <h3><span className="group-swatch" style={{ background: Fin.GROUP_COLOR[TG_ACC[accs[0].type]] || 'var(--rule)' }}></span>{g}</h3>
-              <span className="panel-sub">{accs.length} account{accs.length>1?'s':''} · {Fin.fmtILS(gTotal)} · {((gTotal/totalNW)*100).toFixed(0)}%</span>
+              <span className="panel-sub">{accs.length} account{accs.length>1?'s':''} · <span className="private">{Fin.fmtILS(gTotal)}</span> · <span className="private">{((gTotal/totalNW)*100).toFixed(0)}%</span></span>
             </header>
             <div className="acc-list">
               {accs.map(a => <AccountRow key={a.id} acc={a} primaryCurrency={primaryCurrency} onOpen={() => onOpenAccount(a.id)}/>)}

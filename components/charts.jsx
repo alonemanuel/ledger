@@ -69,7 +69,7 @@ function LineChart({ data, height = 220, color = 'var(--accent)', fill = true, p
         {ticks.map((t, i) => (
           <g key={i}>
             <line x1={padding.l} x2={w - padding.r} y1={t.y} y2={t.y} stroke="var(--rule)" strokeDasharray="2 3"/>
-            <text x={padding.l - 8} y={t.y + 3} textAnchor="end" className="chart-axis">{formatY ? formatY(t.v) : Math.round(t.v).toLocaleString()}</text>
+            <text x={padding.l - 8} y={t.y + 3} textAnchor="end" className="chart-axis private">{formatY ? formatY(t.v) : Math.round(t.v).toLocaleString()}</text>
           </g>
         ))}
         {data.map((d, i) => (i % Math.ceil(data.length / 8) === 0 || i === data.length - 1) && (
@@ -87,7 +87,7 @@ function LineChart({ data, height = 220, color = 'var(--accent)', fill = true, p
       {hover != null && (
         <div className="chart-tooltip" style={{ left: Math.min(w - 240, Math.max(0, xs[hover] + 12)), top: 8 }}>
           <div className="tt-label">{Fin.fmtMonth(data[hover].ym)}</div>
-          <div className="tt-value">{formatY ? formatY(data[hover].value) : Fin.fmtILS(data[hover].value)}</div>
+          <div className="tt-value private">{formatY ? formatY(data[hover].value) : Fin.fmtILS(data[hover].value)}</div>
           {tooltipExtra && tooltipExtra(data[hover])}
         </div>
       )}
@@ -126,7 +126,7 @@ function StackedBar({ data, keys, colors, height = 240, padding = { l: 56, r: 16
         {ticks.map((t, i) => (
           <g key={i}>
             <line x1={padding.l} x2={w - padding.r} y1={t.y} y2={t.y} stroke="var(--rule)" strokeDasharray="2 3"/>
-            <text x={padding.l - 8} y={t.y + 3} textAnchor="end" className="chart-axis">{formatY(t.v, { compact: true })}</text>
+            <text x={padding.l - 8} y={t.y + 3} textAnchor="end" className="chart-axis private">{formatY(t.v, { compact: true })}</text>
           </g>
         ))}
         {data.map((d, i) => {
@@ -167,9 +167,9 @@ function StackedBar({ data, keys, colors, height = 240, padding = { l: 56, r: 16
             <div className="tt-row">
               <span className="tt-swatch" style={{ background: colors[k] }}></span>
               <span className="tt-key">{fmtKey(k)}</span>
-              <span className="tt-val">{formatY(data[i][k] || 0)}</span>
+              <span className="tt-val private">{formatY(data[i][k] || 0)}</span>
             </div>
-            <div className="tt-total">Total {formatY(totals[i])}</div>
+            <div className="tt-total">Total <span className="private">{formatY(totals[i])}</span></div>
           </div>
         );
       })()}
@@ -206,7 +206,7 @@ function PairedBars({ data, height = 260, padding = { l: 56, r: 16, t: 16, b: 28
         {ticks.map((t, i) => (
           <g key={i}>
             <line x1={padding.l} x2={w-padding.r} y1={t.y} y2={t.y} stroke="var(--rule)" strokeDasharray="2 3"/>
-            <text x={padding.l - 8} y={t.y + 3} textAnchor="end" className="chart-axis">{Fin.fmtILS(t.v, { compact: true })}</text>
+            <text x={padding.l - 8} y={t.y + 3} textAnchor="end" className="chart-axis private">{Fin.fmtILS(t.v, { compact: true })}</text>
           </g>
         ))}
         {data.map((d, i) => {
@@ -238,9 +238,9 @@ function PairedBars({ data, height = 260, padding = { l: 56, r: 16, t: 16, b: 28
         return (
           <div className="chart-tooltip" style={{ left: Math.min(w - 220, padding.l + hover * slotW + 12), top: 8 }}>
             <div className="tt-label">{Fin.fmtMonth(d.ym)}</div>
-            <div className="tt-row"><span className="tt-swatch" style={{ background: 'oklch(58% 0.08 140)' }}></span><span className="tt-key">Income</span><span className="tt-val">{Fin.fmtILS(d.income)}</span></div>
-            <div className="tt-row"><span className="tt-swatch" style={{ background: 'oklch(58% 0.09 30)' }}></span><span className="tt-key">Expense</span><span className="tt-val">{Fin.fmtILS(d.expense)}</span></div>
-            <div className="tt-total">Net {Fin.fmtSigned(d.income - d.expense)}</div>
+            <div className="tt-row"><span className="tt-swatch" style={{ background: 'oklch(58% 0.08 140)' }}></span><span className="tt-key">Income</span><span className="tt-val private">{Fin.fmtILS(d.income)}</span></div>
+            <div className="tt-row"><span className="tt-swatch" style={{ background: 'oklch(58% 0.09 30)' }}></span><span className="tt-key">Expense</span><span className="tt-val private">{Fin.fmtILS(d.expense)}</span></div>
+            <div className="tt-total">Net <span className="private">{Fin.fmtSigned(d.income - d.expense)}</span></div>
           </div>
         );
       })()}
@@ -278,7 +278,7 @@ function Donut({ entries, size = 200, thickness = 26, total, centerLabel, center
             style={{ cursor: onHover ? 'pointer' : 'default', transition: 'opacity .15s' }}/>
         ))}
         <text x={cx} y={cy - 4} textAnchor="middle" className="donut-label">{centerLabel}</text>
-        <text x={cx} y={cy + 16} textAnchor="middle" className="donut-value">{centerValue}</text>
+        <text x={cx} y={cy + 16} textAnchor="middle" className="donut-value private">{centerValue}</text>
       </svg>
     </div>
   );
@@ -402,7 +402,7 @@ function Treemap({ items, height = 320 }) {
                     </foreignObject>
                   )}
                   <text x={it.x + 8} y={it.y + (big ? 38 : 18)} className="tm-label">{it.label}</text>
-                  <text x={it.x + 8} y={it.y + (big ? 54 : 34)} className="tm-value">{Fin.fmtILS(it.value, { compact: true })}</text>
+                  <text x={it.x + 8} y={it.y + (big ? 54 : 34)} className="tm-value private">{Fin.fmtILS(it.value, { compact: true })}</text>
                 </>
               )}
             </g>
@@ -416,8 +416,8 @@ function Treemap({ items, height = 320 }) {
         return (
           <div className="chart-tooltip" style={{ left: tipX, top: tipY }}>
             <div className="tt-label">{it.label}</div>
-            <div className="tt-value">{Fin.fmtILS(it.value)}</div>
-            <div className="tt-sub">{Fin.fmtPct(it.value / total)} of total</div>
+            <div className="tt-value private">{Fin.fmtILS(it.value)}</div>
+            <div className="tt-sub"><span className="private">{Fin.fmtPct(it.value / total)}</span> of total</div>
           </div>
         );
       })()}

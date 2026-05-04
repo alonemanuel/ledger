@@ -5,7 +5,7 @@ function KPICard({ label, value, sub, trend }) {
   return (
     <div className="kpi">
       <div className="kpi-label">{label}</div>
-      <div className="kpi-value">{value}</div>
+      <div className="kpi-value private">{value}</div>
       {sub && <div className={`kpi-sub ${trend || ''}`}>{sub}</div>}
     </div>
   );
@@ -40,7 +40,7 @@ function NetWorthChart({ ownerFilter }) {
               <div key={p.acc.id} className="tt-row">
                 <Icon name={ACC_TYPE_ICON[p.acc.type]} size={11}/>
                 <span className="tt-key">{p.acc.name} <span className="muted">{p.acc.owner}</span></span>
-                <span className="tt-val">{Fin.fmtILS(p.value, { compact: true })}</span>
+                <span className="tt-val private">{Fin.fmtILS(p.value, { compact: true })}</span>
               </div>
             ))}
             {d.parts.length > 6 && <div className="tt-row muted">+ {d.parts.length - 6} more</div>}
@@ -72,7 +72,7 @@ function DonutCard({ title, entries, centerLabel, centerValue }) {
             onMouseLeave={() => setHover(null)}>
             <span className="sw" style={{ background: e.color }}></span>
             <span className="lk">{e.label}</span>
-            <span className="lv">{Fin.fmtILS(e.value, { compact: true })}</span>
+            <span className="lv private">{Fin.fmtILS(e.value, { compact: true })}</span>
           </li>
         ))}
       </ul>
@@ -117,10 +117,10 @@ function OverviewTab() {
       </div>
 
       <div className="kpi-grid">
-        <KPICard label="Net worth" value={Fin.fmtILS(nw)} sub={`${Fin.fmtSigned(delta)} MoM`} trend={delta >= 0 ? 'up' : 'down'}/>
-        <KPICard label="Δ MoM" value={Fin.fmtSigned(delta, (v) => Fin.fmtILS(v, { compact: true }))} sub={`${((delta/nwPrev)*100).toFixed(2)}% change`} trend={delta >= 0 ? 'up' : 'down'}/>
+        <KPICard label="Net worth" value={Fin.fmtILS(nw)} sub={<><span className="private">{Fin.fmtSigned(delta)}</span> MoM</>} trend={delta >= 0 ? 'up' : 'down'}/>
+        <KPICard label="Δ MoM" value={Fin.fmtSigned(delta, (v) => Fin.fmtILS(v, { compact: true }))} sub={<><span className="private">{((delta/nwPrev)*100).toFixed(2)}%</span> change</>} trend={delta >= 0 ? 'up' : 'down'}/>
         <KPICard label="Avg monthly income" value={Fin.fmtILS(avgInc, { compact: true })} sub={`12-mo trailing`}/>
-        <KPICard label="Avg monthly spend" value={Fin.fmtILS(avgExp, { compact: true })} sub={`net ${Fin.fmtSigned(avgInc - avgExp, (v) => Fin.fmtILS(v, { compact: true }))} / mo`} trend={(avgInc - avgExp) >= 0 ? 'up' : 'down'}/>
+        <KPICard label="Avg monthly spend" value={Fin.fmtILS(avgExp, { compact: true })} sub={<>net <span className="private">{Fin.fmtSigned(avgInc - avgExp, (v) => Fin.fmtILS(v, { compact: true }))}</span> / mo</>} trend={(avgInc - avgExp) >= 0 ? 'up' : 'down'}/>
       </div>
 
       <section className="panel">
@@ -151,7 +151,7 @@ function OverviewTab() {
                 <span className="al-main">{e.label}</span>
                 <span className="al-sub">{e.sub} · {e.owner}</span>
               </span>
-              <span className={`act-amt ${e.amount >= 0 ? 'pos' : 'neg'}`}>{Fin.fmtSigned(e.amount)}</span>
+              <span className={`act-amt private ${e.amount >= 0 ? 'pos' : 'neg'}`}>{Fin.fmtSigned(e.amount)}</span>
             </li>
           ))}
         </ul>

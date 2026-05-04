@@ -57,23 +57,23 @@ function PassiveTab() {
       <section className="panel hero-panel compact">
         <div className="hero-num">
           <div className="hero-label">Passive income · last {windowMonths} months</div>
-          <div className="hero-value">{Fin.fmtILS(total12)}</div>
-          <div className="hero-sub">avg {Fin.fmtILS(total12/windowMonths, { compact: true })} / month</div>
+          <div className="hero-value private">{Fin.fmtILS(total12)}</div>
+          <div className="hero-sub">avg <span className="private">{Fin.fmtILS(total12/windowMonths, { compact: true })}</span> / month</div>
         </div>
         <div className="hero-split">
           <div className="hsplit">
             <div className="hsplit-label"><Icon name="coin" size={13}/> Liquid</div>
-            <div className="hsplit-val">{Fin.fmtILS(liquid, { compact: true })}</div>
+            <div className="hsplit-val private">{Fin.fmtILS(liquid, { compact: true })}</div>
             <div className="hsplit-sub">dividends · interest · gains</div>
           </div>
           <div className="hsplit">
             <div className="hsplit-label"><Icon name="lock" size={13}/> Locked</div>
-            <div className="hsplit-val">{Fin.fmtILS(locked, { compact: true })}</div>
+            <div className="hsplit-val private">{Fin.fmtILS(locked, { compact: true })}</div>
             <div className="hsplit-sub">pension · study fund</div>
           </div>
           <div className="hsplit">
             <div className="hsplit-label"><Icon name="bolt" size={13}/> Blended yield</div>
-            <div className="hsplit-val">{Fin.fmtPct(blendedYield, 2)}</div>
+            <div className="hsplit-val private">{Fin.fmtPct(blendedYield, 2)}</div>
             <div className="hsplit-sub">on liquid avg bal.</div>
           </div>
         </div>
@@ -103,9 +103,9 @@ function PassiveTab() {
               {accountYields.map(({ acc, earned, avgBal, apy }) => (
                 <tr key={acc.id}>
                   <td><span className="acc-icon-inline"><Icon name={ACC_TYPE_ICON[acc.type]} size={13}/></span> {acc.name} <span className="acc-meta-inline">{acc.owner}</span></td>
-                  <td className="r mono">{Fin.fmtILS(avgBal, { compact: true })}</td>
-                  <td className="r mono">{Fin.fmtILS(earned, { compact: true })}</td>
-                  <td className="r mono apy">
+                  <td className="r mono private">{Fin.fmtILS(avgBal, { compact: true })}</td>
+                  <td className="r mono private">{Fin.fmtILS(earned, { compact: true })}</td>
+                  <td className="r mono apy private">
                     <span className="apy-bar"><span style={{ width: `${Math.min(100, apy*100*4)}%`, background: apy > 0.07 ? 'oklch(58% 0.08 140)' : apy > 0.04 ? 'oklch(68% 0.09 80)' : 'oklch(58% 0.09 30)' }}></span></span>
                     <span>{Fin.fmtPct(apy, 1)}</span>
                   </td>
@@ -121,7 +121,7 @@ function PassiveTab() {
             <div className="bench-row">
               <div className="bench-label">Your liquid yield <span className="muted">(cash + IBKR + MM)</span></div>
               <div className="bench-bar"><span style={{ width: `${(blendedYield/0.12)*100}%`, background: 'var(--accent)' }}></span></div>
-              <div className="bench-val">{Fin.fmtPct(blendedYield, 2)}</div>
+              <div className="bench-val private">{Fin.fmtPct(blendedYield, 2)}</div>
             </div>
             <div className="bench-row">
               <div className="bench-label">SPY (S&amp;P 500) — 10y avg <span className="muted">reference</span></div>
@@ -135,8 +135,8 @@ function PassiveTab() {
             </div>
           </div>
           <div className="bench-note">
-            At your current liquid yield, ₪{(liquidAvgBal).toLocaleString('en-IL', { maximumFractionDigits: 0 })} of liquid avg balance generates ~{Fin.fmtILS(liquidAvgBal*blendedYield, { compact: true })}/yr.
-            To match a 4% SWR baseline you'd need ~{Fin.fmtILS((total12/swr), { compact: true })} invested.
+            At your current liquid yield, <span className="private">₪{(liquidAvgBal).toLocaleString('en-IL', { maximumFractionDigits: 0 })}</span> of liquid avg balance generates ~<span className="private">{Fin.fmtILS(liquidAvgBal*blendedYield, { compact: true })}</span>/yr.
+            To match a 4% SWR baseline you'd need ~<span className="private">{Fin.fmtILS((total12/swr), { compact: true })}</span> invested.
           </div>
         </section>
       </div>
