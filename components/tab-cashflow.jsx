@@ -11,6 +11,7 @@ function CashflowTab() {
     try { return localStorage.getItem(CF_SAVINGS_LS) !== 'false'; }
     catch (_) { return true; }
   });
+  const [expSort, setExpSort] = useStateCf({ col: 'amount', dir: 'desc' });
   const setShowSavings = (v) => {
     setShowSavingsState(v);
     try { localStorage.setItem(CF_SAVINGS_LS, String(v)); } catch (_) {}
@@ -75,7 +76,21 @@ function CashflowTab() {
   const topSpend = window.FinanceData.EXPENSES
     .filter(e => months.includes(e.ym) && matchOwner(e))
     .sort((a, b) => Fin.toILS(b.amount, b.currency, b.ym) - Fin.toILS(a.amount, a.currency, a.ym))
-    .slice(0, 12);
+    .slice(0, 5);
+
+  const sortedExpenses = window.FinanceData.EXPENSES
+    .filter(e => months.includes(e.ym) && matchOwner(e))
+    .slice()
+    .sort((a, b) => {
+      const sign = expSort.dir === 'asc' ? 1 : -1;
+      if (expSort.col === 'date') return sign * a.date.localeCompare(b.date);
+      return sign * (Fin.toILS(a.amount, a.currency, a.ym) - Fin.toILS(b.amount, b.currency, b.ym));
+    });
+
+  const sortArrow = (col) => expSort.col === col ? (expSort.dir === 'asc' ? ' ↑' : ' ↓') : null;
+  const toggleSort = (col) => setExpSort(s =>
+    s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'desc' }
+  );
 
   // mystery
   const mystery = window.FinanceData.EXPENSES.filter(e => !e.category && months.includes(e.ym) && matchOwner(e));
@@ -147,6 +162,37 @@ function CashflowTab() {
           <thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th>Owner</th><th className="r">Amount</th></tr></thead>
           <tbody>
             {topSpend.map(e => (
+              <tr key={e.id}>
+                <td className="mono">{e.date}</td>
+                <td>{e.merchant}</td>
+                <td>
+                  <span className="cat-pill" style={{ '--c': Fin.CATEGORY_COLOR[e.category || 'uncategorized'] }}>
+                    <Icon name={CAT_ICON[e.category || 'uncategorized']} size={11}/>
+                    {Fin.PRETTY_CAT[e.category] || e.category || '—'}
+                  </span>
+                </td>
+                <td>{e.owner}</td>
+                <td className="r mono private">{Fin.fmtILS(e.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section className="panel">
+        <header className="panel-h"><h3>Expenses</h3><span className="panel-sub">{sortedExpenses.length} transactions · {windowMonths}m</span></header>
+        <table className="data-tbl compact">
+          <thead>
+            <tr>
+              <th className="sortable" onClick={() => toggleSort('date')}>Date{sortArrow('date')}</th>
+              <th>Merchant</th>
+              <th>Category</th>
+              <th>Owner</th>
+              <th className="r sortable" onClick={() => toggleSort('amount')}>Amount{sortArrow('amount')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedExpenses.map(e => (
               <tr key={e.id}>
                 <td className="mono">{e.date}</td>
                 <td>{e.merchant}</td>
