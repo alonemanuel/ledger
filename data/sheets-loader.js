@@ -72,7 +72,7 @@
     localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: accessToken, expiresAt }));
   }
 
-  function requestSignIn() {
+  function requestSignIn({ silent = false } = {}) {
     return new Promise((resolve, reject) => {
       if (!tokenClient) {
         reject(new Error('Sign-in not ready — Google Identity library not loaded yet'));
@@ -80,11 +80,11 @@
       }
       tokenClient.callback = (response) => {
         if (response.error) {
-          reject(new Error(`OAuth error: ${response.error}`));
+          reject(new Error(silent ? 'SILENT_FAILED' : `OAuth error: ${response.error}`));
           return;
         }
         if (!response.access_token) {
-          reject(new Error('No access token received'));
+          reject(new Error(silent ? 'SILENT_FAILED' : 'No access token received'));
           return;
         }
         saveToken(response);
@@ -92,11 +92,15 @@
       };
       tokenClient.error_callback = (err) => {
         const t = err?.type || '';
+        if (silent) { reject(new Error('SILENT_FAILED')); return; }
         if (t === 'popup_failed_to_open') reject(new Error('POPUP_BLOCKED'));
         else if (t === 'popup_closed') reject(new Error('POPUP_CLOSED'));
         else reject(new Error(`OAuth error: ${err?.message || t || 'unknown'}`));
       };
-      tokenClient.requestAccessToken({ prompt: 'select_account' });
+      // Silent mode uses prompt:'' which reuses the existing Google session
+      // without showing a popup. Works only if the user is already signed in
+      // to Google in this browser and has previously consented to our scopes.
+      tokenClient.requestAccessToken({ prompt: silent ? '' : 'select_account' });
     });
   }
 
@@ -302,6 +306,16 @@
       } catch (e) {
         if (e.message !== 'AUTH_EXPIRED') throw e;
       }
+    }
+    // Try silent refresh — works without a popup as long as the user is still
+    // signed in to Google in this browser and has previously consented. This
+    // is what lets the page "stay signed in" for weeks even though Google
+    // access tokens themselves only live 1 hour.
+    try {
+      await requestSignIn({ silent: true });
+      return await fetchAndPopulate();
+    } catch (e) {
+      if (e.message !== 'SILENT_FAILED' && e.message !== 'AUTH_EXPIRED') throw e;
     }
     throw new Error('NEEDS_SIGNIN');
   }
