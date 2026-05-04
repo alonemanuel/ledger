@@ -229,11 +229,14 @@
 
   // ── transform rows → FinanceData shape (ported verbatim from CSV path) ──
   const ALL_MONTHS = (() => {
+    const now = new Date();
+    const endYear = now.getFullYear();
+    const endMonth = now.getMonth() + 1; // 1-based
     const out = [];
-    for (let y = 2024; y <= 2026; y++) {
+    for (let y = 2024; y <= endYear; y++) {
       for (let m = 1; m <= 12; m++) {
         if (y === 2024 && m < 5) continue;
-        if (y === 2026 && m > 5) continue;
+        if (y === endYear && m > endMonth) continue;
         out.push(`${y}-${String(m).padStart(2, '0')}`);
       }
     }
