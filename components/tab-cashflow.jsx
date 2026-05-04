@@ -1,23 +1,42 @@
 // Tab: Cashflow
 const { useState: useStateCf } = React;
 
+const CF_SAVINGS_LS = 'ledger_cashflow_show_savings';
+
 function CashflowTab() {
   const [windowMonths, setWindowMonths] = useStateCf(12);
   const [openCat, setOpenCat] = useStateCf(null);
   const [ownerFilter, setOwnerFilter] = useStateCf('all');
+  const [showSavings, setShowSavingsState] = useStateCf(() => {
+    try { return localStorage.getItem(CF_SAVINGS_LS) !== 'false'; }
+    catch (_) { return true; }
+  });
+  const setShowSavings = (v) => {
+    setShowSavingsState(v);
+    try { localStorage.setItem(CF_SAVINGS_LS, String(v)); } catch (_) {}
+  };
 
   const months = Fin.ALL_MONTHS.slice(-windowMonths);
   const matchOwner = (rec) => ownerFilter === 'all' || rec.owner === ownerFilter;
 
-  // Income vs expense per month
+  // Income vs expense per month. Investment categories (e.g. savings_transfer)
+  // are split out so the IvE chart can either hide them (showSavings off) or
+  // stack them as a blue segment on top of the expense bar (showSavings on).
+  // The net line in PairedBars considers the total outflow shown in the bar.
   const ie = months.map(ym => {
     const inc = window.FinanceData.INCOME
       .filter(i => i.ym === ym && matchOwner(i))
       .reduce((s, i) => s + Fin.toILS(i.amount, i.currency, i.ym), 0);
-    const exp = window.FinanceData.EXPENSES
+    let regular = 0, investment = 0;
+    window.FinanceData.EXPENSES
       .filter(e => e.ym === ym && matchOwner(e))
-      .reduce((s, e) => s + Fin.toILS(e.amount, e.currency, e.ym), 0);
-    return { ym, income: inc, expense: exp };
+      .forEach(e => {
+        const v = Fin.toILS(e.amount, e.currency, e.ym);
+        if (Fin.isInvestment(e)) investment += v; else regular += v;
+      });
+    return showSavings
+      ? { ym, income: inc, expense: regular, investment }
+      : { ym, income: inc, expense: regular };
   });
 
   // Stacked expenses by category (with hover details)
@@ -81,8 +100,12 @@ function CashflowTab() {
             <button key={o} className={ownerFilter === o ? 'on' : ''} onClick={() => setOwnerFilter(o)}>{o === 'all' ? 'All' : o}</button>
           ))}
         </div>
+        <label className="toggle-mini" title="Include investment transfers (e.g. → IBKR) as a stacked segment on the expense bar">
+          <input type="checkbox" checked={showSavings} onChange={e => setShowSavings(e.target.checked)}/>
+          <span>Show savings</span>
+        </label>
         <span className="toolbar-spacer"></span>
-        <span className="total-pill">In <span className="private">{Fin.fmtILS(ie.reduce((s,x)=>s+x.income,0), { compact: true })}</span> · Out <span className="private">{Fin.fmtILS(ie.reduce((s,x)=>s+x.expense,0), { compact: true })}</span></span>
+        <span className="total-pill">In <span className="private">{Fin.fmtILS(ie.reduce((s,x)=>s+x.income,0), { compact: true })}</span> · Out <span className="private">{Fin.fmtILS(ie.reduce((s,x)=>s + x.expense + (x.investment||0), 0), { compact: true })}</span></span>
       </div>
 
       <section className="panel">
@@ -91,6 +114,9 @@ function CashflowTab() {
         <div className="legend-row">
           <span><span className="sw" style={{ background: 'oklch(58% 0.08 140)' }}></span>Income</span>
           <span><span className="sw" style={{ background: 'oklch(58% 0.09 30)' }}></span>Expense</span>
+          {showSavings && (
+            <span><span className="sw" style={{ background: Fin.INVESTMENT_COLOR }}></span>Savings</span>
+          )}
           <span><span className="sw" style={{ background: 'var(--ink)', height: 2, width: 14, marginRight: 6 }}></span>Net</span>
         </div>
       </section>

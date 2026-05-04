@@ -261,6 +261,13 @@ const PRETTY_TYPE = {
   other: 'Other',
 };
 
+// Categories whose expense rows are not consumption — money moved into
+// investments / savings rather than spent. Used by the cashflow tab to
+// optionally separate them from regular expenses in the IvE chart.
+const INVESTMENT_CATEGORIES = new Set(['savings_transfer']);
+const isInvestment = (e) => e && INVESTMENT_CATEGORIES.has(e.category);
+const INVESTMENT_COLOR = 'oklch(60% 0.11 240)'; // muted blue
+
 const PRETTY_CAT = {
   food: 'Food', transport: 'Transport', housing: 'Housing', utilities: 'Utilities',
   health: 'Health', entertainment: 'Entertainment', travel: 'Travel', shopping: 'Shopping',
@@ -297,7 +304,8 @@ window.Fin = {
   passiveInMonth, PASSIVE_TYPES,
   groupedAssets, byOwner, byCurrency,
   recentActivity, accountSeries, avgBalance, passivePerAccount,
-  GROUP_COLOR, CATEGORY_COLOR, INCOME_TYPE_COLOR,
+  GROUP_COLOR, CATEGORY_COLOR, INCOME_TYPE_COLOR, INVESTMENT_COLOR,
+  INVESTMENT_CATEGORIES, isInvestment,
   PRETTY_TYPE, PRETTY_CAT,
   rebuildDerivations,
   sliceByRange, RANGE_OPTIONS,

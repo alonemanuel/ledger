@@ -178,6 +178,10 @@ function StackedBar({ data, keys, colors, height = 240, padding = { l: 56, r: 16
 }
 
 // ── PAIRED INCOME-VS-EXPENSE BAR + NET LINE ────────────────────────────────
+// data: [{ ym, income, expense, investment? }]. When `investment` is present
+// (and > 0), the expense bar is rendered as two stacked segments: red for
+// regular expense, blue for investment. The net line considers the total
+// outflow (expense + investment).
 function PairedBars({ data, height = 260, padding = { l: 56, r: 16, t: 16, b: 28 } }) {
   const wrapRef = useRef(null);
   const [w, setW] = useState(800);
@@ -189,16 +193,22 @@ function PairedBars({ data, height = 260, padding = { l: 56, r: 16, t: 16, b: 28
   }, []);
   const innerW = w - padding.l - padding.r;
   const innerH = height - padding.t - padding.b;
-  const maxV = Math.max(...data.map(d => Math.max(d.income, d.expense)), 1);
+  const totalOut = (d) => d.expense + (d.investment || 0);
+  const maxV = Math.max(...data.map(d => Math.max(d.income, totalOut(d))), 1);
   const slotW = innerW / data.length;
   const barW = slotW * 0.32;
   const [hover, setHover] = useState(null);
 
+  const INCOME_COLOR = 'oklch(58% 0.08 140)';
+  const EXPENSE_COLOR = 'oklch(58% 0.09 30)';
+  const INV_COLOR = (Fin && Fin.INVESTMENT_COLOR) || 'oklch(60% 0.11 240)';
+
   const ticks = [];
   for (let i = 0; i <= 4; i++) ticks.push({ v: (maxV*i)/4, y: padding.t + (1 - i/4) * innerH });
   // net line, scaled to same axis but offset differently
-  const netMax = Math.max(...data.map(d => Math.abs(d.income - d.expense)), 1);
+  const netMax = Math.max(...data.map(d => Math.abs(d.income - totalOut(d))), 1);
   const netY = (v) => padding.t + innerH/2 - (v / netMax) * (innerH/2 - 4);
+  const anyInvestment = data.some(d => (d.investment || 0) > 0);
 
   return (
     <div ref={wrapRef} className="chart-wrap">
@@ -213,10 +223,15 @@ function PairedBars({ data, height = 260, padding = { l: 56, r: 16, t: 16, b: 28
           const cx = padding.l + i * slotW + slotW/2;
           const incH = (d.income/maxV) * innerH;
           const expH = (d.expense/maxV) * innerH;
+          const invH = ((d.investment || 0)/maxV) * innerH;
+          const baseY = padding.t + innerH;
           return (
             <g key={i} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} opacity={hover == null || hover === i ? 1 : 0.5}>
-              <rect x={cx - barW - 2} y={padding.t + innerH - incH} width={barW} height={incH} fill="oklch(58% 0.08 140)"/>
-              <rect x={cx + 2}        y={padding.t + innerH - expH} width={barW} height={expH} fill="oklch(58% 0.09 30)"/>
+              <rect x={cx - barW - 2} y={baseY - incH} width={barW} height={incH} fill={INCOME_COLOR}/>
+              <rect x={cx + 2}        y={baseY - expH} width={barW} height={expH} fill={EXPENSE_COLOR}/>
+              {invH > 0 && (
+                <rect x={cx + 2} y={baseY - expH - invH} width={barW} height={invH} fill={INV_COLOR}/>
+              )}
               {(i % Math.ceil(data.length/12) === 0) && (
                 <text x={cx} y={height - 8} textAnchor="middle" className="chart-axis">{Fin.fmtMonth(d.ym, { short: true })}</text>
               )}
@@ -227,7 +242,7 @@ function PairedBars({ data, height = 260, padding = { l: 56, r: 16, t: 16, b: 28
         <path
           d={data.map((d, i) => {
             const cx = padding.l + i * slotW + slotW/2;
-            const v = d.income - d.expense;
+            const v = d.income - totalOut(d);
             return `${i === 0 ? 'M' : 'L'}${cx.toFixed(1)},${netY(v).toFixed(1)}`;
           }).join(' ')}
           fill="none" stroke="var(--ink)" strokeWidth="1.5" strokeDasharray="0" opacity="0.65"
@@ -235,12 +250,16 @@ function PairedBars({ data, height = 260, padding = { l: 56, r: 16, t: 16, b: 28
       </svg>
       {hover != null && (() => {
         const d = data[hover];
+        const inv = d.investment || 0;
         return (
           <div className="chart-tooltip" style={{ left: Math.min(w - 220, padding.l + hover * slotW + 12), top: 8 }}>
             <div className="tt-label">{Fin.fmtMonth(d.ym)}</div>
-            <div className="tt-row"><span className="tt-swatch" style={{ background: 'oklch(58% 0.08 140)' }}></span><span className="tt-key">Income</span><span className="tt-val private">{Fin.fmtILS(d.income)}</span></div>
-            <div className="tt-row"><span className="tt-swatch" style={{ background: 'oklch(58% 0.09 30)' }}></span><span className="tt-key">Expense</span><span className="tt-val private">{Fin.fmtILS(d.expense)}</span></div>
-            <div className="tt-total">Net <span className="private">{Fin.fmtSigned(d.income - d.expense)}</span></div>
+            <div className="tt-row"><span className="tt-swatch" style={{ background: INCOME_COLOR }}></span><span className="tt-key">Income</span><span className="tt-val private">{Fin.fmtILS(d.income)}</span></div>
+            <div className="tt-row"><span className="tt-swatch" style={{ background: EXPENSE_COLOR }}></span><span className="tt-key">Expense</span><span className="tt-val private">{Fin.fmtILS(d.expense)}</span></div>
+            {anyInvestment && (
+              <div className="tt-row"><span className="tt-swatch" style={{ background: INV_COLOR }}></span><span className="tt-key">Savings</span><span className="tt-val private">{Fin.fmtILS(inv)}</span></div>
+            )}
+            <div className="tt-total">Net <span className="private">{Fin.fmtSigned(d.income - d.expense - inv)}</span></div>
           </div>
         );
       })()}
