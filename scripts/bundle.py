@@ -34,8 +34,9 @@ def main():
         loader_js = ""  # not needed
         extra_scripts = ""
     else:
-        # Live mode: empty data scaffold + sheets-loader + GIS + SheetJS
+        # Live mode: empty data scaffold + db-loader + sheets-loader + GIS + SheetJS
         data_js = read("data/data.js")
+        db_loader_js = read("data/db-loader.js")
         loader_js = read("data/sheets-loader.js")
         # Inline the demo data source as a string so the "Load demo data"
         # button works in the deployed bundle without needing the
@@ -69,6 +70,7 @@ def main():
             'ReactDOM.createRoot(document.getElementById(\'root\')).render(<App/>);'
         )
 
+    db_loader_script = f'<script>{db_loader_js}</script>' if not USE_EXAMPLE else ''
     loader_script = f'<script>{loader_js}</script>' if loader_js else ''
 
     html = f"""<!doctype html>
@@ -91,6 +93,7 @@ def main():
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
 {extra_scripts}<script>{data_js}</script>
 <script>{helpers}</script>
+{db_loader_script}
 {loader_script}
 <script type="text/babel">{tweaks}</script>
 <script type="text/babel">{icons}</script>

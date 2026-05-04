@@ -23,6 +23,11 @@
   // read+write — old cached tokens lacked write scope and would silently
   // 403 on append. Bumping the key forces a clean re-auth on first load.
   const TOKEN_KEY  = 'ledger_sheets_token_v2';
+  // Durable marker that survives token expiry. Lets us know whether to attempt
+  // a silent refresh on load — without it, we skip silent and go straight to
+  // the sign-in button so Chrome doesn't show a popup-blocked indicator on
+  // fresh origins where Google would have to open a popup anyway.
+  const CONSENTED_KEY = 'ledger_sheets_consented_v1';
   const TAB_NAMES  = ['accounts', 'snapshots', 'income', 'expenses'];
 
   let tokenClient = null;
@@ -71,10 +76,15 @@
     accessToken = null;
   }
 
+  function hasConsented() {
+    return localStorage.getItem(CONSENTED_KEY) === '1';
+  }
+
   function saveToken(response) {
     accessToken = response.access_token;
     const expiresAt = Date.now() + (response.expires_in - 60) * 1000;
     localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: accessToken, expiresAt }));
+    localStorage.setItem(CONSENTED_KEY, '1');
   }
 
   function requestSignIn({ silent = false } = {}) {
@@ -324,17 +334,31 @@
     });
 
     const acctOwner = Object.fromEntries(accounts.map(a => [a.id, a.owner]));
-    const expenses = expensesRaw.map((r, i) => ({
-      id: i + 1,
-      date: r.date,
-      ym: (r.date || '').slice(0, 7),
-      owner: acctOwner[r.account_id] || 'Alon',
-      account: r.account_id,
-      merchant: r.merchant,
-      category: r.category || null,
-      amount: parseFloat(r.amount_native),
-      currency: (r.currency || 'NIS').replace('NIS', 'ILS'),
-    }));
+    // Sheet columns: date, account_id, amount_native, currency, amount_ils,
+    // fx_rate, category, subcategory, merchant, description, source_doc,
+    // billing_date, external_ref_id, created_at
+    const expenses = expensesRaw.map((r, i) => {
+      const amtNative = parseFloat(r.amount_native) || 0;
+      const amtIls = parseFloat(r.amount_ils) || amtNative;
+      const cur = (r.currency || 'ILS').replace('NIS', 'ILS');
+      return {
+        id: i + 1,
+        date: r.date,
+        billing_date: r.billing_date || null,
+        ym: (r.date || '').slice(0, 7),
+        owner: acctOwner[r.account_id] || 'Alon',
+        account: r.account_id,
+        merchant: r.merchant,
+        category: r.category || null,
+        amount: amtIls,
+        purchase_amount: amtNative,
+        purchase_currency: cur,
+        currency: 'ILS',
+        external_ref_id: r.external_ref_id || null,
+        created_at: r.created_at || null,
+        source_doc: r.source_doc || null,
+      };
+    });
 
     return { accounts, snapshots, income, expenses, fxFull, fxCurrent };
   }
@@ -388,11 +412,18 @@
     // signed in to Google in this browser and has previously consented. This
     // is what lets the page "stay signed in" for weeks even though Google
     // access tokens themselves only live 1 hour.
-    try {
-      await requestSignIn({ silent: true });
-      return await fetchAndPopulate();
-    } catch (e) {
-      if (e.message !== 'SILENT_FAILED' && e.message !== 'AUTH_EXPIRED') throw e;
+    //
+    // Skip silent attempt entirely on a fresh origin: without prior consent,
+    // Google has to open a popup (which Chrome blocks without a user gesture)
+    // and the popup-blocked indicator surfaces in the URL bar. Going straight
+    // to the sign-in button keeps that UI clean.
+    if (hasConsented()) {
+      try {
+        await requestSignIn({ silent: true });
+        return await fetchAndPopulate();
+      } catch (e) {
+        if (e.message !== 'SILENT_FAILED' && e.message !== 'AUTH_EXPIRED') throw e;
+      }
     }
     throw new Error('NEEDS_SIGNIN');
   }
@@ -402,6 +433,7 @@
       google.accounts.oauth2.revoke(accessToken, () => {});
     }
     clearCachedToken();
+    localStorage.removeItem(CONSENTED_KEY);
   }
 
   async function loadDemoData() {

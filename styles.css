@@ -51,6 +51,7 @@ body {
 }
 
 .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.dim  { opacity: 0.45; }
 .r { text-align: right; }
 .pos { color: var(--pos); }
 .neg { color: var(--neg); }
