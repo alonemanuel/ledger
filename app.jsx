@@ -166,18 +166,6 @@ function App() {
           <span className="brand-sub">Alon &amp; Amit · personal finance</span>
         </div>
         <div className="header-actions">
-          {window.SheetsLoader?.getSheetUrl?.() && (
-            <a
-              className="theme-toggle"
-              href={window.SheetsLoader.getSheetUrl()}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Open ledger Sheet in a new tab"
-              title="Open ledger Sheet in a new tab"
-            >
-              <Icon name="external" size={16}/>
-            </a>
-          )}
           <button
             className="theme-toggle"
             onClick={() => setTweak('privacy', !t.privacy)}
@@ -233,15 +221,8 @@ function Bootstrap() {
   const start = async () => {
     setError(null); setPhase('loading');
     try {
-      const loader = window.DbLoader || window.SheetsLoader;
-      await loader.init();
-      const counts = await loader.bootstrap();
-      // If DB is empty (no accounts seeded yet), fall back to SheetsLoader
-      if (window.DbLoader && window.SheetsLoader && counts?.accounts === 0) {
-        console.log('[bootstrap] DB empty, falling back to SheetsLoader');
-        await window.SheetsLoader.init();
-        await window.SheetsLoader.bootstrap();
-      }
+      await window.DbLoader.init();
+      await window.DbLoader.bootstrap();
       setTick(x => x + 1); setPhase('ready');
     } catch (e) {
       if (e.message === 'NEEDS_SIGNIN') {
@@ -255,9 +236,8 @@ function Bootstrap() {
   const handleSignIn = async () => {
     setError(null); setPhase('fetching');
     try {
-      const loader = window.DbLoader || window.SheetsLoader;
-      await loader.requestSignIn();
-      await loader.fetchAndPopulate();
+      await window.DbLoader.requestSignIn();
+      await window.DbLoader.fetchAndPopulate();
       setTick(x => x + 1); setPhase('ready');
     } catch (e) {
       if (e.message === 'POPUP_BLOCKED') {
@@ -282,14 +262,14 @@ function Bootstrap() {
       <div className="boot-card">
         <div className="boot-mark">◐</div>
         <div className="boot-title">Ledger</div>
-        <div className="boot-sub">Personal finance · live from Google Sheets</div>
+        <div className="boot-sub">Personal finance dashboard</div>
 
         {phase === 'loading' && <div className="boot-status">Loading…</div>}
 
         {phase === 'fetching' && (
           <div className="boot-status">
             <div className="boot-spinner"/>
-            <div>Fetching from Google Sheets…</div>
+            <div>Loading your ledger…</div>
           </div>
         )}
 
@@ -298,13 +278,13 @@ function Bootstrap() {
             {error && <div className="boot-error">⚠ {error}</div>}
             <button className="boot-btn" onClick={handleSignIn}>Sign in with Google</button>
             <div className="boot-note">
-              Read-only access to your Drive folder.<br/>
-              Tokens stay in your browser; nothing is sent anywhere else.
+              Sign in to access your ledger.<br/>
+              Your data is stored securely and never shared.
             </div>
             <button className="boot-btn boot-btn-ghost" onClick={async () => {
               setError(null); setPhase('fetching');
               try {
-                await (window.DbLoader || window.SheetsLoader).loadDemoData();
+                await window.DbLoader.loadDemoData();
                 setTick(x => x + 1); setPhase('ready');
               } catch (e) {
                 setError(e.message || String(e)); setPhase('error');
@@ -317,7 +297,7 @@ function Bootstrap() {
           <>
             <div className="boot-error">⚠ {error}</div>
             <button className="boot-btn" onClick={start}>Retry</button>
-            <button className="boot-btn boot-btn-ghost" onClick={() => { (window.DbLoader || window.SheetsLoader).signOut(); start(); }}>Sign out & retry</button>
+            <button className="boot-btn boot-btn-ghost" onClick={() => { window.DbLoader.signOut(); start(); }}>Sign out & retry</button>
           </>
         )}
       </div>

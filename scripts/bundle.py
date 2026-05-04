@@ -6,8 +6,8 @@ This is what you deploy / share / open on mobile. The HTML has all CSS, JSX,
 and data inlined — no external requests except for fonts + CDN scripts.
 
 Usage:
-    python scripts/bundle.py            # uses data/data.js (your real data)
-    python scripts/bundle.py --example  # uses data/data.example.js (synthetic)
+    python scripts/bundle.py            # live mode — DB-backed, auth at runtime
+    python scripts/bundle.py --example  # synthetic demo mode — no auth
 """
 import json
 import os
@@ -25,30 +25,22 @@ def read(rel):
 
 def main():
     if USE_EXAMPLE:
-        # Synthetic demo: static data, no Drive auth, no loader
         data_path = "data/data.example.js"
         if not (REPO_ROOT / data_path).exists():
             print(f"ERROR: {data_path} missing.", file=sys.stderr)
             sys.exit(1)
         data_js = read(data_path)
-        loader_js = ""  # not needed
         extra_scripts = ""
     else:
-        # Live mode: empty data scaffold + db-loader + sheets-loader + GIS + SheetJS
         data_js = read("data/data.js")
         db_loader_js = read("data/db-loader.js")
-        loader_js = read("data/sheets-loader.js")
-        # Inline the demo data source as a string so the "Load demo data"
-        # button works in the deployed bundle without needing the
-        # data.example.js file to be served separately.
         demo_src = read("data/data.example.js")
         demo_literal = json.dumps(demo_src).replace("</", "<\\/")
-        # SheetJS is needed by the Intake tab to convert XLSX uploads to CSV
-        # in the browser. Live mode only — demo mode hides the Intake tab.
         extra_scripts = (
             '<script src="https://accounts.google.com/gsi/client" async defer></script>\n'
             '<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>\n'
             f'<script>window.__LEDGER_DEMO_SOURCE__ = {demo_literal};</script>\n'
+            f'<script>{db_loader_js}</script>\n'
         )
 
     styles = read("styles.css")
@@ -63,15 +55,11 @@ def main():
     intake = read("components/tab-intake.jsx")
     app = read("app.jsx")
 
-    # In example mode, replace Bootstrap with direct App render (no auth flow)
     if USE_EXAMPLE:
         app = app.replace(
             'ReactDOM.createRoot(document.getElementById(\'root\')).render(<Bootstrap/>);',
             'ReactDOM.createRoot(document.getElementById(\'root\')).render(<App/>);'
         )
-
-    db_loader_script = f'<script>{db_loader_js}</script>' if not USE_EXAMPLE else ''
-    loader_script = f'<script>{loader_js}</script>' if loader_js else ''
 
     html = f"""<!doctype html>
 <html lang="en">
@@ -93,8 +81,6 @@ def main():
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
 {extra_scripts}<script>{data_js}</script>
 <script>{helpers}</script>
-{db_loader_script}
-{loader_script}
 <script type="text/babel">{tweaks}</script>
 <script type="text/babel">{icons}</script>
 <script type="text/babel">{charts}</script>
@@ -112,14 +98,9 @@ def main():
     with open(out, "w", encoding="utf-8") as f:
         f.write(html)
 
-    # SPA fallback (rewrites) is configured in the *root* vercel.json,
-    # which Vercel reads for routing. Don't write a vercel.json into the
-    # output dir — it would shadow the root one and accidentally drop
-    # the /api/* exclusion needed for Vercel Functions.
-
     print(f"✓ Wrote {out}")
     print(f"  Size: {os.path.getsize(out):,} B")
-    print(f"  Mode: {'example (synthetic data)' if USE_EXAMPLE else 'live (Google Sheets)'}")
+    print(f"  Mode: {'example (synthetic data)' if USE_EXAMPLE else 'live (Neon Postgres)'}")
 
 
 if __name__ == "__main__":

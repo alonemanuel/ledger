@@ -379,15 +379,14 @@ export default async function handler(req, res) {
 
   console.log(`[intake] done model=${usedModel} ${totalMs}ms snapshots=${validated.snapshots.length} income=${validated.income.length} expenses=${validated.expenses.length} rejected=${validated.rejected.length} finish=${finishReason}`);
 
-  // Write to DB if user is authenticated (Bearer token present).
-  // Falls back gracefully — if no auth header or DB not configured, just
-  // return the extracted rows for the frontend to handle (Sheets path).
+  // In dryRun mode (review-before-apply), skip DB write — just return rows.
+  const dryRun = body.dryRun === true;
   let dbWritten = false;
   const user = req.headers.authorization?.startsWith('Bearer ')
     ? await authenticate(req, { status: () => ({ json: () => {} }) })
     : null;
 
-  if (user && dbUrl) {
+  if (user && dbUrl && !dryRun) {
     try {
       const sql = getDb();
       const uid = user.userId;

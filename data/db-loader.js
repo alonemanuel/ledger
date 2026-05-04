@@ -1,12 +1,9 @@
 // Database loader — fetches the user's ledger from the API (backed by Neon
 // Postgres) and populates window.FinanceData in place.
 //
-// Uses Google Identity Services for authentication (same OAuth popup as the
-// Sheets loader). The access token is sent as a Bearer token to /api/*
-// endpoints, which verify it with Google and auto-register the user.
-//
-// Public API matches SheetsLoader so app.jsx Bootstrap can switch with
-// minimal changes.
+// Uses Google Identity Services for authentication. The access token is sent
+// as a Bearer token to /api/* endpoints, which verify it with Google and
+// auto-register the user.
 
 (function () {
   const CLIENT_ID = '524822374717-jun05s52km4co3h1b838r3qsip0850aa.apps.googleusercontent.com';
@@ -147,7 +144,7 @@
       status: a.status,
     }));
 
-    // Snapshot dedup + forward-fill (same logic as sheets-loader)
+    // Snapshot dedup + forward-fill
     const perAcct = {};
     snapRows.forEach(s => {
       const date = s.date || '';

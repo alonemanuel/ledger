@@ -1,4 +1,4 @@
-// Empty data scaffold — populated at runtime by sheets-loader.js.
+// Empty data scaffold — populated at runtime by db-loader.js.
 // helpers.js relies on these top-level consts being declared.
 
 const FX = {

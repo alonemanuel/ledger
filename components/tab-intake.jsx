@@ -1,12 +1,9 @@
 // Intake tab — paste free text or drop a file (PNG / JPG / PDF / CSV / XLSX),
-// the server (Vercel Function /api/intake) extracts structured rows via Claude,
-// the browser appends those rows to the live ledger Sheet.
-//
-// v1: no review step. Rows go straight in. The user can edit the Sheet
-// directly if anything looks wrong.
+// the server extracts structured rows via Gemini, the user reviews them in a
+// table, then approves to write to the DB.
 
-const MAX_FILE_BYTES = 3 * 1024 * 1024;   // 3 MB raw — leaves margin under the 4.5 MB Vercel body limit after base64.
-const MAX_TEXT_BYTES = 1 * 1024 * 1024;   // 1 MB of pasted text/CSV — roughly 250k tokens, well past Claude's needs.
+const MAX_FILE_BYTES = 3 * 1024 * 1024;
+const MAX_TEXT_BYTES = 1 * 1024 * 1024;
 const MAX_CSV_ROWS = 500;
 
 function readFileAsBase64(file) {
@@ -15,16 +12,11 @@ function readFileAsBase64(file) {
     fr.onerror = () => reject(new Error('File read failed'));
     fr.onload = () => {
       const result = fr.result || '';
-      // result looks like "data:<mediaType>;base64,<...>"
       const comma = result.indexOf(',');
       resolve(comma >= 0 ? result.slice(comma + 1) : result);
     };
     fr.readAsDataURL(file);
   });
-}
-
-function readFileAsText(file) {
-  return file.text();
 }
 
 async function fileToPayload(file) {
@@ -35,8 +27,8 @@ async function fileToPayload(file) {
   const name = (file.name || '').toLowerCase();
   const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1) : '';
   const type = file.type || '';
-
   const fileName = file.name || null;
+
   if (type.startsWith('image/') || ['png','jpg','jpeg','gif','webp'].includes(ext)) {
     const content = await readFileAsBase64(file);
     return { kind: 'image', mediaType: type || `image/${ext === 'jpg' ? 'jpeg' : ext}`, content, fileName };
@@ -56,28 +48,16 @@ async function fileToPayload(file) {
     }
     return { kind: 'text', content: csv, fileName };
   }
-  // Default: treat as text/CSV.
-  const text = await readFileAsText(file);
-  if (text.length > MAX_TEXT_BYTES) {
-    throw new Error(`File too large after read (${(text.length/1024/1024).toFixed(1)} MB).`);
-  }
+  const text = await file.text();
+  if (text.length > MAX_TEXT_BYTES) throw new Error(`File too large (${(text.length/1024/1024).toFixed(1)} MB).`);
   if (text.split('\n').length > MAX_CSV_ROWS + 1 && (ext === 'csv' || type === 'text/csv')) {
     throw new Error(`CSV has more than ${MAX_CSV_ROWS} rows; please trim before uploading.`);
   }
   return { kind: 'text', content: text, fileName };
 }
 
-async function pasteToPayload(text) {
-  if (!text || !text.trim()) throw new Error('Nothing to send');
-  if (text.length > MAX_TEXT_BYTES) throw new Error(`Pasted text too large (${(text.length/1024/1024).toFixed(1)} MB).`);
-  return { kind: 'text', content: text };
-}
-
-async function postIntake(payload) {
-  const loader = window.DbLoader || window.SheetsLoader;
-  const token = loader?.getCurrentToken?.() || null;
-  const sheetId = window.SheetsLoader?.getSheetId?.() || null;
-  const schema  = window.SheetsLoader?.getSchemaSnapshot?.() || null;
+async function postExtract(payload) {
+  const token = window.DbLoader?.getCurrentToken?.() || null;
   const accounts = (window.FinanceData?.ACCOUNTS || []).map(a => ({
     id: a.id, nickname: a.name, type: a.type, currency: a.currency,
   }));
@@ -89,7 +69,7 @@ async function postIntake(payload) {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ ...payload, sheetId, schema, accounts, categories, sourceDoc }),
+    body: JSON.stringify({ ...payload, accounts, categories, sourceDoc, dryRun: true }),
   });
   if (!res.ok) {
     const text = await res.text();
@@ -98,140 +78,249 @@ async function postIntake(payload) {
   return await res.json();
 }
 
-// Map API response fields → Google Sheet column names. The Sheet has legacy
-// headers (amount_native, currency, amount_ils, fx_rate) while the API now
-// returns richer fields (purchase_amount, purchase_currency, charge_amount_ils).
-function mapExpenseToSheetRow(row) {
-  const pa = parseFloat(row.purchase_amount) || 0;
-  const ca = parseFloat(row.charge_amount_ils) || pa;
-  const pc = row.purchase_currency || 'ILS';
-  const fxRate = (pc !== 'ILS' && pa > 0) ? +(ca / pa).toFixed(4) : 1;
-  return {
-    date: row.date,
-    account_id: row.account_id,
-    amount_native: pa,
-    currency: pc,
-    amount_ils: ca,
-    fx_rate: fxRate,
-    category: row.category || '',
-    subcategory: '',
-    merchant: row.merchant || '',
-    description: row.description || '',
-    source_doc: row.source_doc || '',
-    billing_date: row.billing_date || '',
-    external_ref_id: row.external_ref_id || '',
-    created_at: row.created_at || '',
-  };
+async function postApprove(rows, tab) {
+  const token = window.DbLoader?.getCurrentToken?.() || null;
+  const res = await fetch(`/api/${tab}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ rows }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Write failed: ${res.status} ${text.slice(0, 200)}`);
+  }
+  return await res.json();
 }
 
-async function applyExtraction(extracted) {
-  const counts = { snapshots: 0, income: 0, expenses: 0 };
-  const errors = [];
-  const expenseRows = (extracted.expenses || []).map(mapExpenseToSheetRow);
-  const tabRows = [
-    ['snapshots', extracted.snapshots],
-    ['income',    extracted.income],
-    ['expenses',  expenseRows],
-  ];
-  for (const [tab, rows] of tabRows) {
-    if (!Array.isArray(rows) || !rows.length) continue;
-    try {
-      const r = await window.SheetsLoader.appendRows(tab, rows);
-      counts[tab] = r.appended || 0;
-    } catch (e) {
-      errors.push(`${tab}: ${e.message || e}`);
-    }
-  }
-  return { counts, errors };
+// ── Review table for extracted rows ─────────────────────────────────────────
+
+function ReviewTable({ expenses, income, snapshots, onApprove, onCancel, busy }) {
+  const total = expenses.length + income.length + snapshots.length;
+  if (!total) return null;
+
+  return (
+    <div className="intake-review">
+      <div className="intake-review-header">
+        <strong>{total} row{total !== 1 ? 's' : ''} extracted</strong>
+        <span className="dim">Review below, then approve or cancel.</span>
+      </div>
+
+      {expenses.length > 0 && (
+        <div className="intake-review-section">
+          <h4>{expenses.length} expense{expenses.length !== 1 ? 's' : ''}</h4>
+          <div style={{ overflowX: 'auto' }}>
+          <table className="data-tbl compact">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Merchant</th>
+                <th>Category</th>
+                <th className="r">Amount</th>
+                <th>Currency</th>
+                <th>Ref</th>
+              </tr>
+            </thead>
+            <tbody>
+              {expenses.map((e, i) => (
+                <tr key={i}>
+                  <td className="mono">{e.date}</td>
+                  <td>{e.merchant}</td>
+                  <td>{e.category || <span className="dim">—</span>}</td>
+                  <td className="r mono">{e.charge_amount_ils || e.purchase_amount}</td>
+                  <td>{e.purchase_currency}</td>
+                  <td className="mono dim">{e.external_ref_id || ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          </div>
+        </div>
+      )}
+
+      {income.length > 0 && (
+        <div className="intake-review-section">
+          <h4>{income.length} income</h4>
+          <table className="data-tbl compact">
+            <thead><tr><th>Date</th><th>Source</th><th>Type</th><th className="r">Amount</th><th>Currency</th></tr></thead>
+            <tbody>
+              {income.map((r, i) => (
+                <tr key={i}>
+                  <td className="mono">{r.date}</td>
+                  <td>{r.source}</td>
+                  <td>{r.type}</td>
+                  <td className="r mono">{r.gross_native}</td>
+                  <td>{r.currency}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {snapshots.length > 0 && (
+        <div className="intake-review-section">
+          <h4>{snapshots.length} snapshot{snapshots.length !== 1 ? 's' : ''}</h4>
+          <table className="data-tbl compact">
+            <thead><tr><th>Date</th><th>Account</th><th className="r">Balance</th><th>Currency</th></tr></thead>
+            <tbody>
+              {snapshots.map((s, i) => (
+                <tr key={i}>
+                  <td className="mono">{s.date}</td>
+                  <td>{s.account_id}</td>
+                  <td className="r mono">{s.balance_native}</td>
+                  <td>{s.currency}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="intake-review-actions">
+        <button className="intake-submit" onClick={onApprove} disabled={busy}>
+          {busy ? 'Saving…' : `Approve & save ${total} row${total !== 1 ? 's' : ''}`}
+        </button>
+        <button className="intake-pick" onClick={onCancel} disabled={busy}>Cancel</button>
+      </div>
+    </div>
+  );
 }
 
-function summarizeCounts(counts, rejected) {
-  const parts = [];
-  if (counts.expenses)  parts.push(`${counts.expenses} expense${counts.expenses === 1 ? '' : 's'}`);
-  if (counts.income)    parts.push(`${counts.income} income`);
-  if (counts.snapshots) parts.push(`${counts.snapshots} snapshot${counts.snapshots === 1 ? '' : 's'}`);
-  const rejCount = Array.isArray(rejected) ? rejected.length : 0;
-  if (parts.length) {
-    return `Added ${parts.join(', ')}.${rejCount ? ` (${rejCount} skipped — see console.)` : ''}`;
-  }
-  if (rejCount) {
-    return `No rows added — ${rejCount} skipped. ${rejected[0].reason}.`;
-  }
-  return 'No rows extracted. The model skips entries where the account is ambiguous — try naming the account (e.g. "alon\'s checking") or being more explicit.';
-}
+// ── Main IntakeTab ──────────────────────────────────────────────────────────
 
 function IntakeTab({ onIngested }) {
   const { useState, useRef, useEffect } = React;
   const [text, setText] = useState('');
-  const [status, setStatus] = useState(null);   // { kind: 'busy'|'ok'|'err', msg }
+  const [phase, setPhase] = useState('input');  // input | extracting | review | saving | done
+  const [status, setStatus] = useState(null);
   const [drop, setDrop] = useState(false);
-  const [stubBanner, setStubBanner] = useState(false);
   const [busyStartedAt, setBusyStartedAt] = useState(null);
   const [now, setNow] = useState(Date.now());
+  const [extraction, setExtraction] = useState(null);
   const fileInputRef = useRef(null);
 
-  // Tick once a second while busy so the elapsed-time display updates.
   useEffect(() => {
     if (!busyStartedAt) return;
     const id = setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(id);
   }, [busyStartedAt]);
 
-  const noLoader = !window.DbLoader && !window.SheetsLoader;
-
-  if (noLoader) {
+  if (!window.DbLoader) {
     return (
       <div className="intake">
         <h2 className="intake-h">Intake</h2>
         <div className="intake-disabled">
-          Intake is disabled in demo mode. Sign in with Google in the live build to drop receipts and statements here.
+          Intake is disabled in demo mode. Sign in to drop receipts and statements here.
         </div>
       </div>
     );
   }
 
-  const submit = async (payload) => {
-    const sizeKb = Math.round((payload.content?.length || 0) / 1024);
-    setStatus({ kind: 'busy', msg: `Sending ${sizeKb} KB ${payload.kind} to model…` });
-    setStubBanner(false);
+  const extract = async (payload) => {
+    setPhase('extracting');
+    setStatus({ kind: 'busy', msg: `Sending ${Math.round((payload.content?.length || 0) / 1024)} KB ${payload.kind} to model…` });
     setBusyStartedAt(Date.now());
+    setExtraction(null);
     try {
-      const extracted = await postIntake(payload);
-      if (extracted.stub) setStubBanner(true);
-      const { counts, errors } = await applyExtraction(extracted);
-      // Refresh local FinanceData so other tabs reflect the new rows.
-      const refreshLoader = window.DbLoader || window.SheetsLoader;
-      try { await refreshLoader.fetchAndPopulate(); } catch (_) { /* ignore */ }
-      if (extracted.rejected?.length) {
-        console.warn('[intake] rejected rows:', extracted.rejected);
-      }
-      console.log('[intake] response:', {
-        model: extracted.model, attempts: extracted.attempts, total_ms: extracted.total_ms,
-        finish_reason: extracted.finish_reason, truncated: extracted.truncated, usage: extracted.usage,
-        counts, rejected: extracted.rejected?.length || 0,
+      const result = await postExtract(payload);
+      console.log('[intake] extraction:', {
+        model: result.model, total_ms: result.total_ms,
+        expenses: (result.expenses || []).length,
+        income: (result.income || []).length,
+        snapshots: (result.snapshots || []).length,
+        rejected: (result.rejected || []).length,
+        truncated: result.truncated,
       });
-      let msg = summarizeCounts(counts, extracted.rejected);
-      if (extracted.truncated) {
-        msg += ` ⚠ Output truncated (finish=${extracted.finish_reason}) — likely missed rows. Try a smaller chunk.`;
+      if (result.rejected?.length) {
+        console.warn('[intake] rejected:', result.rejected);
       }
-      if (errors.length) msg += ` Errors: ${errors.join('; ')}`;
-      const meta = extracted.model ? ` · ${extracted.model}, ${Math.round((extracted.total_ms || 0) / 100) / 10}s` : '';
-      setStatus({ kind: (errors.length || extracted.truncated) ? 'err' : 'ok', msg: msg + meta });
-      if (!errors.length && (counts.expenses || counts.income || counts.snapshots) && onIngested) {
-        onIngested();
+
+      const total = (result.expenses?.length || 0) + (result.income?.length || 0) + (result.snapshots?.length || 0);
+      if (total === 0) {
+        const meta = result.model ? ` · ${result.model}` : '';
+        setStatus({ kind: 'err', msg: 'No rows extracted. Try being more specific about the account or merchant.' + meta });
+        setPhase('input');
+      } else {
+        setExtraction(result);
+        const meta = result.model ? ` · ${result.model}, ${Math.round((result.total_ms || 0) / 100) / 10}s` : '';
+        let warn = '';
+        if (result.truncated) warn = ' ⚠ Output may be truncated.';
+        if (result.rejected?.length) warn += ` ${result.rejected.length} skipped.`;
+        setStatus({ kind: 'ok', msg: `Extracted ${total} rows${warn}${meta}` });
+        setPhase('review');
       }
     } catch (e) {
       setStatus({ kind: 'err', msg: e.message || String(e) });
+      setPhase('input');
     } finally {
       setBusyStartedAt(null);
     }
   };
 
+  const approve = async () => {
+    if (!extraction) return;
+    setPhase('saving');
+    setBusyStartedAt(Date.now());
+    try {
+      const errors = [];
+      let totalInserted = 0;
+
+      for (const [tab, rows] of [['expenses', extraction.expenses], ['income', extraction.income], ['snapshots', extraction.snapshots]]) {
+        if (!rows?.length) continue;
+        try {
+          const mapRow = tab === 'expenses' ? (r) => {
+            const pa = parseFloat(r.purchase_amount) || 0;
+            const ca = parseFloat(r.charge_amount_ils) || pa;
+            const pc = r.purchase_currency || 'ILS';
+            return {
+              date: r.date, account_id: r.account_id, amount_native: pa, currency: pc,
+              amount_ils: ca, fx_rate: (pc !== 'ILS' && pa > 0) ? +(ca / pa).toFixed(4) : 1,
+              category: r.category || null, merchant: r.merchant, description: r.description || null,
+              source_doc: r.source_doc || null, billing_date: r.billing_date || null,
+              external_ref_id: r.external_ref_id || null,
+            };
+          } : (r) => r;
+          const result = await postApprove(rows.map(mapRow), tab);
+          totalInserted += result.inserted || 0;
+        } catch (e) {
+          errors.push(`${tab}: ${e.message}`);
+        }
+      }
+
+      try { await window.DbLoader.fetchAndPopulate(); } catch (_) {}
+
+      if (errors.length) {
+        setStatus({ kind: 'err', msg: `Saved ${totalInserted} rows. Errors: ${errors.join('; ')}` });
+      } else {
+        setStatus({ kind: 'ok', msg: `Saved ${totalInserted} rows to ledger.` });
+      }
+      setExtraction(null);
+      setText('');
+      setPhase('input');
+      if (totalInserted > 0 && onIngested) onIngested();
+    } catch (e) {
+      setStatus({ kind: 'err', msg: e.message || String(e) });
+      setPhase('review');
+    } finally {
+      setBusyStartedAt(null);
+    }
+  };
+
+  const cancel = () => {
+    setExtraction(null);
+    setPhase('input');
+    setStatus(null);
+  };
+
   const onSubmitText = async () => {
     try {
-      const payload = await pasteToPayload(text);
-      await submit(payload);
-      setText('');
+      const payload = { kind: 'text', content: text };
+      if (!text?.trim()) throw new Error('Nothing to send');
+      if (text.length > MAX_TEXT_BYTES) throw new Error('Text too large');
+      await extract(payload);
     } catch (e) {
       setStatus({ kind: 'err', msg: e.message || String(e) });
     }
@@ -241,7 +330,7 @@ function IntakeTab({ onIngested }) {
     if (!file) return;
     try {
       const payload = await fileToPayload(file);
-      await submit(payload);
+      await extract(payload);
     } catch (e) {
       setStatus({ kind: 'err', msg: e.message || String(e) });
     } finally {
@@ -255,67 +344,66 @@ function IntakeTab({ onIngested }) {
     if (f) onPickFile(f);
   };
 
-  const busy = status?.kind === 'busy';
+  const busy = phase === 'extracting' || phase === 'saving';
 
   return (
     <div className="intake">
       <h2 className="intake-h">Intake</h2>
       <p className="intake-lede">
-        Paste a free-text receipt, drop a screenshot, PDF, CSV or XLSX. An LLM extracts rows and appends them to the ledger Sheet directly.
+        Paste text, drop a screenshot, PDF, CSV or XLSX. Gemini extracts rows — review before saving.
       </p>
 
-      {stubBanner && (
-        <div className="intake-warn">
-          <strong>Stub mode:</strong> /api/intake is returning hardcoded test data. The live Claude call lands in a follow-up step.
-        </div>
+      {phase !== 'review' && (
+        <>
+          <div
+            className={`intake-drop ${drop ? 'over' : ''}`}
+            onDragOver={e => { e.preventDefault(); setDrop(true); }}
+            onDragLeave={() => setDrop(false)}
+            onDrop={onDrop}
+          >
+            Drop a file here, or
+            <button type="button" className="intake-pick" onClick={() => fileInputRef.current?.click()} disabled={busy}>
+              choose one
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              style={{ display: 'none' }}
+              accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.csv,.tsv,.txt,.xlsx,image/*,application/pdf,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              onChange={e => onPickFile(e.target.files?.[0])}
+            />
+          </div>
+
+          <div className="intake-paste">
+            <label className="intake-paste-label" htmlFor="intake-paste-area">Or paste text:</label>
+            <textarea
+              id="intake-paste-area"
+              className="intake-textarea"
+              placeholder="Paste a receipt, a list of transactions, a balance update…"
+              value={text}
+              onChange={e => setText(e.target.value)}
+              rows={6}
+              disabled={busy}
+            />
+            <div className="intake-actions">
+              <button type="button" className="intake-submit" onClick={onSubmitText} disabled={busy || !text.trim()}>
+                {busy ? 'Working…' : 'Extract'}
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
-      <div
-        className={`intake-drop ${drop ? 'over' : ''}`}
-        onDragOver={e => { e.preventDefault(); setDrop(true); }}
-        onDragLeave={() => setDrop(false)}
-        onDrop={onDrop}
-      >
-        Drop a file here, or
-        <button
-          type="button"
-          className="intake-pick"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={busy}
-        >
-          choose one
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          style={{ display: 'none' }}
-          accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.csv,.tsv,.txt,.xlsx,image/*,application/pdf,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          onChange={e => onPickFile(e.target.files?.[0])}
+      {phase === 'review' && extraction && (
+        <ReviewTable
+          expenses={extraction.expenses || []}
+          income={extraction.income || []}
+          snapshots={extraction.snapshots || []}
+          onApprove={approve}
+          onCancel={cancel}
+          busy={phase === 'saving'}
         />
-      </div>
-
-      <div className="intake-paste">
-        <label className="intake-paste-label" htmlFor="intake-paste-area">Or paste text:</label>
-        <textarea
-          id="intake-paste-area"
-          className="intake-textarea"
-          placeholder="Paste a receipt, a list of transactions, a balance update, anything goes…"
-          value={text}
-          onChange={e => setText(e.target.value)}
-          rows={8}
-          disabled={busy}
-        />
-        <div className="intake-actions">
-          <button
-            type="button"
-            className="intake-submit"
-            onClick={onSubmitText}
-            disabled={busy || !text.trim()}
-          >
-            {busy ? 'Working…' : 'Submit text'}
-          </button>
-        </div>
-      </div>
+      )}
 
       {status && (
         <div className={`intake-status intake-status-${status.kind}`}>
@@ -323,7 +411,7 @@ function IntakeTab({ onIngested }) {
           {busy && busyStartedAt && (
             <span className="intake-status-elapsed">
               {' '}· {((now - busyStartedAt) / 1000).toFixed(1)}s elapsed
-              {(now - busyStartedAt) > 8000 && ' (Gemini retries can take ~10s under load)'}
+              {(now - busyStartedAt) > 8000 && ' (retries can take ~10s under load)'}
             </span>
           )}
         </div>
