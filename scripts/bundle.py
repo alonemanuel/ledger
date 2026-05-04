@@ -104,10 +104,10 @@ def main():
     with open(out, "w", encoding="utf-8") as f:
         f.write(html)
 
-    # SPA fallback so client-side paths like /cashflow don't 404 on refresh.
-    vercel_json = '{"rewrites":[{"source":"/(.*)","destination":"/"}]}\n'
-    with open(out.parent / "vercel.json", "w", encoding="utf-8") as f:
-        f.write(vercel_json)
+    # SPA fallback (rewrites) is configured in the *root* vercel.json,
+    # which Vercel reads for routing. Don't write a vercel.json into the
+    # output dir — it would shadow the root one and accidentally drop
+    # the /api/* exclusion needed for Vercel Functions.
 
     print(f"✓ Wrote {out}")
     print(f"  Size: {os.path.getsize(out):,} B")
