@@ -247,18 +247,27 @@
       status: a.status,
     }));
 
+    // Bucket raw snapshots by account, keeping the full date (not just ym)
+    // so we can pick the most-recent snapshot per month deterministically.
+    // Earlier we sorted [ym, balance] tuples with default JS sort (string
+    // compare), which made the same-month winner depend on the string order
+    // of the balance — i.e. "150000" < "62190.71" lexicographically, so a
+    // larger newer balance was silently overwritten by a smaller older one.
     const perAcct = {};
     snapshotsRaw.forEach(s => {
-      const ym = (s.date || '').slice(0, 7);
+      const date = s.date || '';
       if (!perAcct[s.account_id]) perAcct[s.account_id] = [];
-      perAcct[s.account_id].push([ym, parseFloat(s.balance_native)]);
+      perAcct[s.account_id].push({ date, ym: date.slice(0, 7), balance: parseFloat(s.balance_native) });
     });
     const snapshots = [];
     accounts.forEach(acc => {
-      const list = (perAcct[acc.id] || []).slice().sort();
+      const list = (perAcct[acc.id] || []).slice().sort((a, b) => a.date.localeCompare(b.date));
       if (!list.length) return;
-      const firstYm = list[0][0];
-      const dict = Object.fromEntries(list);
+      const firstYm = list[0].ym;
+      // Build ym → balance, with the LATEST date per month winning (the loop
+      // is in ascending date order, so later writes overwrite earlier ones).
+      const dict = {};
+      list.forEach(item => { dict[item.ym] = item.balance; });
       let last = null;
       ALL_MONTHS.forEach(ym => {
         if (ym < firstYm) return;
