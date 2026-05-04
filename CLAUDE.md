@@ -80,7 +80,7 @@ All amounts are stored in **native currency** (ILS or USD). FX-to-ILS conversion
 - **Mutate, don't reassign.** The data globals are populated in place by `drive-loader.js`. Never `ACCOUNTS = [...]` — always `ACCOUNTS.length = 0; ACCOUNTS.push(...)`.
 - **Privacy invariant.** `data/data.js` and `dist/` are gitignored. `data.example.js` is the only data file committed. Never commit real numbers.
 - **Editorial-meets-terminal aesthetic.** Inter / JetBrains Mono / Newsreader fonts; ochre accent; oklch color space. Color maps for groups/categories/income types live in `helpers.js` (`GROUP_COLOR`, `CATEGORY_COLOR`, `INCOME_TYPE_COLOR`) — extend these when adding new categories rather than hardcoding colors in components.
-- **Privacy mode** (`data-privacy="on"` on `<html>`) blurs numbers via CSS — make sure new monetary values respect this by using existing `Fin.fmtILS` / `Fin.fmtUSD` helpers and standard markup classes.
+- **Privacy mode** (`data-privacy="on"` on `<html>`) blurs numbers via CSS. Any element rendering a monetary value (via `Fin.fmtILS` / `Fin.fmtUSD` / `Fin.fmtSigned` / `Fin.fmtPct` for yields) must include `private` in its className. Hover reveals the value individually. For monetary values inline in mixed text, wrap just the number in `<span className="private">…</span>`.
 - **Months as `YYYY-MM` strings** throughout. The canonical month list is `Fin.ALL_MONTHS` (currently 2024-05 through 2026-05; `monthsRange()` in `helpers.js`).
 
 ## Refresh / deploy workflow

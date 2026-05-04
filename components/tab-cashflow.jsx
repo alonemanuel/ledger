@@ -82,7 +82,7 @@ function CashflowTab() {
           ))}
         </div>
         <span className="toolbar-spacer"></span>
-        <span className="total-pill">In {Fin.fmtILS(ie.reduce((s,x)=>s+x.income,0), { compact: true })} · Out {Fin.fmtILS(ie.reduce((s,x)=>s+x.expense,0), { compact: true })}</span>
+        <span className="total-pill">In <span className="private">{Fin.fmtILS(ie.reduce((s,x)=>s+x.income,0), { compact: true })}</span> · Out <span className="private">{Fin.fmtILS(ie.reduce((s,x)=>s+x.expense,0), { compact: true })}</span></span>
       </div>
 
       <section className="panel">
@@ -131,7 +131,7 @@ function CashflowTab() {
                   </span>
                 </td>
                 <td>{e.owner}</td>
-                <td className="r mono">{Fin.fmtILS(e.amount)}</td>
+                <td className="r mono private">{Fin.fmtILS(e.amount)}</td>
               </tr>
             ))}
           </tbody>
@@ -140,7 +140,7 @@ function CashflowTab() {
 
       {mystery.length > 0 && (
         <section className="panel mystery">
-          <header className="panel-h"><h3>⚠ Uncategorized</h3><span className="panel-sub">{mystery.length} rows · {Fin.fmtILS(mystery.reduce((s,e)=>s+Fin.toILS(e.amount,e.currency,e.ym),0))}</span></header>
+          <header className="panel-h"><h3>⚠ Uncategorized</h3><span className="panel-sub">{mystery.length} rows · <span className="private">{Fin.fmtILS(mystery.reduce((s,e)=>s+Fin.toILS(e.amount,e.currency,e.ym),0))}</span></span></header>
           <table className="data-tbl compact">
             <thead><tr><th>Date</th><th>Merchant</th><th>Owner</th><th className="r">Amount</th></tr></thead>
             <tbody>
@@ -149,7 +149,7 @@ function CashflowTab() {
                   <td className="mono">{e.date}</td>
                   <td>{e.merchant}</td>
                   <td>{e.owner}</td>
-                  <td className="r mono">{Fin.fmtILS(e.amount)}</td>
+                  <td className="r mono private">{Fin.fmtILS(e.amount)}</td>
                 </tr>
               ))}
             </tbody>
@@ -173,7 +173,7 @@ function CashflowTab() {
                     <td>{e.merchant}</td>
                     <td>{e.owner}</td>
                     <td>{Fin.accountById(e.account)?.name || '—'}</td>
-                    <td className="r mono">{Fin.fmtILS(e.amount)}</td>
+                    <td className="r mono private">{Fin.fmtILS(e.amount)}</td>
                   </tr>
                 ))}
               </tbody>

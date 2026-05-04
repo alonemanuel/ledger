@@ -55,19 +55,13 @@ body {
 .pos { color: var(--pos); }
 .neg { color: var(--neg); }
 
-[data-privacy='on'] .kpi-value,
-[data-privacy='on'] .acc-bal,
-[data-privacy='on'] .hero-value,
-[data-privacy='on'] .donut-value,
-[data-privacy='on'] td.mono,
-[data-privacy='on'] .legend .lv,
-[data-privacy='on'] .total-pill,
-[data-privacy='on'] .act-amt {
+[data-privacy='on'] .private {
   filter: blur(6px);
   transition: filter .15s;
 }
-[data-privacy='on'] .kpi-value:hover,
-[data-privacy='on'] .acc-bal:hover { filter: blur(0); }
+[data-privacy='on'] .private:hover {
+  filter: blur(0);
+}
 
 /* ── App shell ─────────────────────────────────────────────────────────── */
 .app { min-height: 100vh; }
