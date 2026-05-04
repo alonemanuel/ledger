@@ -210,12 +210,10 @@ const passivePerAccount = (months = last12) => {
 // ── COLORS ─────────────────────────────────────────────────────────────────
 // Group colors — muted, harmonious, oklch-based
 const GROUP_COLOR = {
-  'Cash / Checking': 'oklch(72% 0.07 80)',     // sand
-  'Money Market':    'oklch(68% 0.09 60)',     // ochre
-  'Brokerage':       'oklch(58% 0.09 35)',     // terracotta
-  'Pension':         'oklch(50% 0.08 250)',    // ink-blue
-  'Provident':       'oklch(60% 0.06 200)',    // muted teal
-  'Study Fund':      'oklch(64% 0.08 130)',    // moss
+  'Cash / Checking': 'oklch(72% 0.07 80)',   // sand
+  'Savings':         'oklch(68% 0.09 60)',   // ochre
+  'Investments':     'oklch(58% 0.09 35)',   // terracotta
+  'Retirement':      'oklch(50% 0.08 250)',  // ink-blue
 };
 
 const CATEGORY_COLOR = {

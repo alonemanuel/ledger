@@ -232,14 +232,13 @@ const EXPENSES = genExpenses();
 // ── ASSET CLASS GROUPING ────────────────────────────────────────────────────
 const TYPE_GROUP = {
   checking: 'Cash / Checking', savings: 'Cash / Checking',
-  money_market: 'Money Market',
-  brokerage: 'Brokerage',
-  pension_comprehensive: 'Pension', pension_supplementary: 'Pension',
-  provident: 'Provident',
-  study_fund: 'Study Fund',
+  money_market: 'Savings',
+  brokerage: 'Investments', provident: 'Investments',
+  pension_comprehensive: 'Retirement', pension_supplementary: 'Retirement',
+  study_fund: 'Retirement',
 };
 
-const GROUP_ORDER = ['Cash / Checking','Money Market','Brokerage','Pension','Provident','Study Fund'];
+const GROUP_ORDER = ['Cash / Checking','Savings','Investments','Retirement'];
 
 const TYPE_ICON = {
   checking: '🏦', savings: '🏦',
