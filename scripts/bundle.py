@@ -34,16 +34,15 @@ def main():
         loader_js = ""  # not needed
         extra_scripts = ""
     else:
-        # Live mode: empty data scaffold + drive-loader + Papa Parse + GIS
+        # Live mode: empty data scaffold + sheets-loader + GIS
         data_js = read("data/data.js")
-        loader_js = read("data/drive-loader.js")
+        loader_js = read("data/sheets-loader.js")
         # Inline the demo data source as a string so the "Load demo data"
         # button works in the deployed bundle without needing the
         # data.example.js file to be served separately.
         demo_src = read("data/data.example.js")
         demo_literal = json.dumps(demo_src).replace("</", "<\\/")
         extra_scripts = (
-            '<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>\n'
             '<script src="https://accounts.google.com/gsi/client" async defer></script>\n'
             f'<script>window.__LEDGER_DEMO_SOURCE__ = {demo_literal};</script>\n'
         )
@@ -112,7 +111,7 @@ def main():
 
     print(f"✓ Wrote {out}")
     print(f"  Size: {os.path.getsize(out):,} B")
-    print(f"  Mode: {'example (synthetic data)' if USE_EXAMPLE else 'live (Google Drive)'}")
+    print(f"  Mode: {'example (synthetic data)' if USE_EXAMPLE else 'live (Google Sheets)'}")
 
 
 if __name__ == "__main__":
