@@ -233,11 +233,15 @@ function Bootstrap() {
   const start = async () => {
     setError(null); setPhase('loading');
     try {
-      // Initialize GIS before showing the signin button so the click
-      // handler can call requestAccessToken synchronously and Chrome
-      // doesn't classify the OAuth window as a programmatic popup.
-      await window.SheetsLoader.init();
-      await window.SheetsLoader.bootstrap();
+      const loader = window.DbLoader || window.SheetsLoader;
+      await loader.init();
+      const counts = await loader.bootstrap();
+      // If DB is empty (no accounts seeded yet), fall back to SheetsLoader
+      if (window.DbLoader && window.SheetsLoader && counts?.accounts === 0) {
+        console.log('[bootstrap] DB empty, falling back to SheetsLoader');
+        await window.SheetsLoader.init();
+        await window.SheetsLoader.bootstrap();
+      }
       setTick(x => x + 1); setPhase('ready');
     } catch (e) {
       if (e.message === 'NEEDS_SIGNIN') {
@@ -251,8 +255,9 @@ function Bootstrap() {
   const handleSignIn = async () => {
     setError(null); setPhase('fetching');
     try {
-      await window.SheetsLoader.requestSignIn();
-      await window.SheetsLoader.fetchAndPopulate();
+      const loader = window.DbLoader || window.SheetsLoader;
+      await loader.requestSignIn();
+      await loader.fetchAndPopulate();
       setTick(x => x + 1); setPhase('ready');
     } catch (e) {
       if (e.message === 'POPUP_BLOCKED') {
@@ -299,7 +304,7 @@ function Bootstrap() {
             <button className="boot-btn boot-btn-ghost" onClick={async () => {
               setError(null); setPhase('fetching');
               try {
-                await window.SheetsLoader.loadDemoData();
+                await (window.DbLoader || window.SheetsLoader).loadDemoData();
                 setTick(x => x + 1); setPhase('ready');
               } catch (e) {
                 setError(e.message || String(e)); setPhase('error');
@@ -312,7 +317,7 @@ function Bootstrap() {
           <>
             <div className="boot-error">⚠ {error}</div>
             <button className="boot-btn" onClick={start}>Retry</button>
-            <button className="boot-btn boot-btn-ghost" onClick={() => { window.SheetsLoader.signOut(); start(); }}>Sign out & retry</button>
+            <button className="boot-btn boot-btn-ghost" onClick={() => { (window.DbLoader || window.SheetsLoader).signOut(); start(); }}>Sign out & retry</button>
           </>
         )}
       </div>

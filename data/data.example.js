@@ -202,25 +202,38 @@ function genExpenses() {
         const day = 1 + Math.floor(rnd()*27);
         const owner = rnd() > 0.6 ? 'Alon' : 'Amit';
         const account = owner === 'Alon' ? 'hap-checking-alon' : 'leumi-checking-amit';
+        const dateStr = `${ym}-${String(day).padStart(2,'0')}`;
+        const billingDay = Math.min(28, day + 5 + Math.floor(rnd()*10));
+        const billingDate = `${ym}-${String(billingDay).padStart(2,'0')}`;
+        const refId = String(1000000 + Math.floor(rnd()*9000000));
         out.push({
           id: ++id,
-          date: `${ym}-${String(day).padStart(2,'0')}`,
+          date: dateStr,
+          billing_date: billingDate,
           ym,
           owner,
           account,
           merchant,
           category: cat,
           amount: amt,
+          purchase_amount: amt,
+          purchase_currency: 'ILS',
           currency: 'ILS',
+          external_ref_id: refId,
+          created_at: `${dateStr}T12:00:00.000Z`,
+          source_doc: null,
         });
       }
     });
     // tiny chance of uncategorized
     if (rnd() > 0.8) {
+      const uncatAmt = Math.round(80+rnd()*400);
       out.push({
-        id: ++id, date: `${ym}-15`, ym,
+        id: ++id, date: `${ym}-15`, billing_date: `${ym}-20`, ym,
         owner: 'Alon', account: 'hap-checking-alon',
-        merchant: '???', category: null, amount: Math.round(80+rnd()*400), currency: 'ILS',
+        merchant: '???', category: null, amount: uncatAmt,
+        purchase_amount: uncatAmt, purchase_currency: 'ILS', currency: 'ILS',
+        external_ref_id: null, created_at: `${ym}-15T12:00:00.000Z`, source_doc: null,
       });
     }
   });
