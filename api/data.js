@@ -1,5 +1,4 @@
 // GET /api/data — full data fetch for a user's ledger.
-// Replaces the Google Sheets read path.
 
 import { getDb, authenticate } from './_db.js';
 
