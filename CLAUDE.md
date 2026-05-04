@@ -70,6 +70,10 @@ All amounts are stored in **native currency** (ILS or USD). FX-to-ILS conversion
 
 `tweaks-panel.jsx` defines `useTweaks` hook backed by localStorage. Defaults live in `app.jsx` between `/*EDITMODE-BEGIN*/` and `/*EDITMODE-END*/` markers — these markers exist so external tools can rewrite the defaults block; preserve them when editing.
 
+## Demo data requirement
+
+**Every feature or code change must be reflected in `data/data.example.js`.** When adding new fields, categories, accounts, or data structures, update the synthetic demo data so the change is visually exercised in example mode (`bundle.py --example`). Do not ship a feature that is invisible or broken in the demo build.
+
 ## Conventions
 
 - **Globals over imports.** Add new shared utilities to `window.Fin` in `helpers.js`, not as ES exports.
