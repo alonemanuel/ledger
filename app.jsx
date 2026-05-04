@@ -21,11 +21,10 @@ function FxStrip() {
   const [rate, setRate] = useState(window.FinanceData.FX.current);
 
   useEffect(() => {
-    const get = (url, pick) => fetch(url).then(r => { if (!r.ok) throw new Error(); return r.json(); }).then(pick);
-    get('https://api.frankfurter.app/latest?from=USD&to=ILS', d => d.rates && d.rates.ILS)
-      .catch(() => get('https://open.er-api.com/v6/latest/USD', d => d.rates && d.rates.ILS))
-      .then(r => { if (r) { setRate(r); window.FinanceData.FX.current = r; } })
-      .catch(() => {});
+    fetch('https://api.frankfurter.app/latest?from=USD&to=ILS')
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(d => { const r = d.rates && d.rates.ILS; if (r) { setRate(r); window.FinanceData.FX.current = r; } })
+      .catch(e => console.warn('FX fetch failed:', e));
   }, []);
 
   return (
