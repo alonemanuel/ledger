@@ -674,3 +674,57 @@ body {
 .intake-status-busy { background: var(--panel-2); color: var(--ink-2); }
 .intake-status-ok   { background: oklch(95% 0.06 150); color: oklch(40% 0.12 150); border: 1px solid oklch(80% 0.10 150); }
 .intake-status-err  { background: oklch(95% 0.05 30);  color: oklch(45% 0.18 30);  border: 1px solid oklch(80% 0.10 30);  word-break: break-word; }
+
+/* ── Error boundary fallback ─────────────────────────────────────────── */
+.error-boundary-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg);
+}
+.error-boundary-card {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 40px 36px;
+  max-width: 480px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+}
+.error-boundary-icon {
+  font-size: 40px;
+  color: var(--neg);
+  margin-bottom: 8px;
+  line-height: 1;
+}
+.error-boundary-title {
+  font-family: var(--font-serif);
+  font-size: 24px;
+  font-weight: 500;
+  margin: 0 0 8px;
+  color: var(--ink);
+}
+.error-boundary-message {
+  font-size: 14px;
+  color: var(--ink-2);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+.error-boundary-stack {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 12px;
+  margin: 0 0 20px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+}
