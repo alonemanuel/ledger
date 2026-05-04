@@ -49,7 +49,7 @@ function FxStrip({ rate, manualOpen, setManualOpen, manualRate, setManualRate })
   );
 }
 
-const TAB_IDS = ['overview', 'accounts', 'cashflow', 'passive'];
+const TAB_IDS = ['overview', 'accounts', 'cashflow', 'passive', 'intake'];
 
 function parseUrl() {
   const segs = location.pathname.split('/').filter(Boolean);
@@ -69,6 +69,9 @@ function App() {
   const [{ tab, accountId }, setRoute] = useState(parseUrl);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualRate, setManualRate] = useState(window.FinanceData.FX.current);
+  // Bumped after a successful Intake; keys the data-driven tabs so they
+  // re-mount and re-derive from the freshly populated FinanceData.
+  const [dataTick, setDataTick] = useState(0);
 
   const goTab = (id) => setRoute({ tab: id, accountId: null });
   const openAccount = (id) => setRoute({ tab: 'accounts', accountId: id });
@@ -107,6 +110,7 @@ function App() {
     { id: 'accounts',  label: 'Accounts' },
     { id: 'cashflow',  label: 'Cashflow' },
     { id: 'passive',   label: 'Passive Income' },
+    { id: 'intake',    label: 'Intake' },
   ];
 
   return (
@@ -156,10 +160,11 @@ function App() {
       </header>
 
       <main className="app-main">
-        {tab === 'overview' && <OverviewTab/>}
-        {tab === 'accounts' && <AccountsTab primaryCurrency={t.primaryCurrency} openAccountId={accountId} onOpenAccount={openAccount} onCloseAccount={closeAccount}/>}
-        {tab === 'cashflow' && <CashflowTab/>}
-        {tab === 'passive' && <PassiveTab/>}
+        {tab === 'overview' && <OverviewTab key={`overview-${dataTick}`}/>}
+        {tab === 'accounts' && <AccountsTab key={`accounts-${dataTick}`} primaryCurrency={t.primaryCurrency} openAccountId={accountId} onOpenAccount={openAccount} onCloseAccount={closeAccount}/>}
+        {tab === 'cashflow' && <CashflowTab key={`cashflow-${dataTick}`}/>}
+        {tab === 'passive' && <PassiveTab key={`passive-${dataTick}`}/>}
+        {tab === 'intake' && <IntakeTab onIngested={() => setDataTick(x => x + 1)}/>}
       </main>
 
       <TweaksPanel>

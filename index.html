@@ -16,6 +16,8 @@
   <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <!-- SheetJS — used by the Intake tab to convert XLSX uploads to CSV in the browser. -->
+  <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <!-- data scaffold + helpers (plain JS, run before babel scripts so they're on window) -->
   <script src="data/data.js"></script>
@@ -32,6 +34,7 @@
   <script type="text/babel" src="components/tab-accounts.jsx"></script>
   <script type="text/babel" src="components/tab-cashflow.jsx"></script>
   <script type="text/babel" src="components/tab-passive.jsx"></script>
+  <script type="text/babel" src="components/tab-intake.jsx"></script>
 
   <!-- App -->
   <script type="text/babel" src="app.jsx"></script>
