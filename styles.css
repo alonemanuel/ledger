@@ -130,10 +130,9 @@ body {
 .theme-toggle:hover { color: var(--ink); border-color: var(--ink-3); }
 
 /* ── FX Strip ──────────────────────────────────────────────────────────── */
-.fx-strip { display: flex; align-items: center; gap: 8px; }
-.fx-mono { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .06em; }
+.fx-strip { display: flex; align-items: center; gap: 5px; }
+.fx-pair { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); }
 .fx-rate { font-family: var(--font-mono); color: var(--ink); font-weight: 500; }
-.fx-meta { font-size: 11px; color: var(--ink-3); }
 
 /* ── Toolbar ───────────────────────────────────────────────────────────── */
 .row-toolbar {
@@ -441,9 +440,6 @@ body {
   .brand-sub { display: none; }
   .header-actions { gap: 6px; min-width: 0; max-width: 100%; }
 
-  .fx-summary { gap: 6px; padding: 6px 10px; min-width: 0; }
-  .fx-mono, .fx-meta { display: none; }
-  .fx-detail { width: min(320px, calc(100vw - 32px)); right: auto; left: 0; }
 
   .app-nav { overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
   .app-nav::-webkit-scrollbar { display: none; }

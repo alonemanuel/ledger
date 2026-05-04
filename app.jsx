@@ -19,23 +19,19 @@ const ACCENT_PALETTES = {
 
 function FxStrip() {
   const [rate, setRate] = useState(window.FinanceData.FX.current);
-  const [live, setLive] = useState(false);
 
   useEffect(() => {
-    fetch('https://api.frankfurter.app/latest?from=USD&to=ILS')
-      .then(r => r.json())
-      .then(d => {
-        const r = d.rates && d.rates.ILS;
-        if (r) { setRate(r); setLive(true); window.FinanceData.FX.current = r; }
-      })
+    const get = (url, pick) => fetch(url).then(r => { if (!r.ok) throw new Error(); return r.json(); }).then(pick);
+    get('https://api.frankfurter.app/latest?from=USD&to=ILS', d => d.rates && d.rates.ILS)
+      .catch(() => get('https://open.er-api.com/v6/latest/USD', d => d.rates && d.rates.ILS))
+      .then(r => { if (r) { setRate(r); window.FinanceData.FX.current = r; } })
       .catch(() => {});
   }, []);
 
   return (
     <div className="fx-strip">
-      <span className="fx-mono">USD/ILS</span>
-      <strong className="fx-rate">{rate.toFixed(4)}</strong>
-      <span className="fx-meta">{live ? 'live' : 'fallback'}</span>
+      <span className="fx-pair">$/₪</span>
+      <strong className="fx-rate">{rate.toFixed(2)}</strong>
     </div>
   );
 }
