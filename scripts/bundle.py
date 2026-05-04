@@ -34,7 +34,7 @@ def main():
         loader_js = ""  # not needed
         extra_scripts = ""
     else:
-        # Live mode: empty data scaffold + sheets-loader + GIS
+        # Live mode: empty data scaffold + sheets-loader + GIS + SheetJS
         data_js = read("data/data.js")
         loader_js = read("data/sheets-loader.js")
         # Inline the demo data source as a string so the "Load demo data"
@@ -42,8 +42,11 @@ def main():
         # data.example.js file to be served separately.
         demo_src = read("data/data.example.js")
         demo_literal = json.dumps(demo_src).replace("</", "<\\/")
+        # SheetJS is needed by the Intake tab to convert XLSX uploads to CSV
+        # in the browser. Live mode only — demo mode hides the Intake tab.
         extra_scripts = (
             '<script src="https://accounts.google.com/gsi/client" async defer></script>\n'
+            '<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>\n'
             f'<script>window.__LEDGER_DEMO_SOURCE__ = {demo_literal};</script>\n'
         )
 
@@ -56,6 +59,7 @@ def main():
     accounts = read("components/tab-accounts.jsx")
     cashflow = read("components/tab-cashflow.jsx")
     passive = read("components/tab-passive.jsx")
+    intake = read("components/tab-intake.jsx")
     app = read("app.jsx")
 
     # In example mode, replace Bootstrap with direct App render (no auth flow)
@@ -95,6 +99,7 @@ def main():
 <script type="text/babel">{accounts}</script>
 <script type="text/babel">{cashflow}</script>
 <script type="text/babel">{passive}</script>
+<script type="text/babel">{intake}</script>
 <script type="text/babel">{app}</script>
 </body>
 </html>
@@ -104,10 +109,10 @@ def main():
     with open(out, "w", encoding="utf-8") as f:
         f.write(html)
 
-    # SPA fallback so client-side paths like /cashflow don't 404 on refresh.
-    vercel_json = '{"rewrites":[{"source":"/(.*)","destination":"/"}]}\n'
-    with open(out.parent / "vercel.json", "w", encoding="utf-8") as f:
-        f.write(vercel_json)
+    # SPA fallback (rewrites) is configured in the *root* vercel.json,
+    # which Vercel reads for routing. Don't write a vercel.json into the
+    # output dir — it would shadow the root one and accidentally drop
+    # the /api/* exclusion needed for Vercel Functions.
 
     print(f"✓ Wrote {out}")
     print(f"  Size: {os.path.getsize(out):,} B")

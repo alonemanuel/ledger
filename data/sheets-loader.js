@@ -18,13 +18,18 @@
   const CLIENT_ID  = '524822374717-jun05s52km4co3h1b838r3qsip0850aa.apps.googleusercontent.com';
   const FOLDER_ID  = '1x3REt2-XYd73s1wH61MFRBPbs94e1NJN';
   const SHEET_NAME = 'ledger';
-  const SCOPES     = 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/spreadsheets.readonly';
-  const TOKEN_KEY  = 'ledger_sheets_token';
+  const SCOPES     = 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/spreadsheets';
+  // Bumped to _v2 when the spreadsheets scope widened from readonly to
+  // read+write — old cached tokens lacked write scope and would silently
+  // 403 on append. Bumping the key forces a clean re-auth on first load.
+  const TOKEN_KEY  = 'ledger_sheets_token_v2';
   const TAB_NAMES  = ['accounts', 'snapshots', 'income', 'expenses'];
 
   let tokenClient = null;
   let accessToken = null;
   let cachedSheetId = null;
+  let cachedHeaders = {};   // { tabName: [...headerStrings] }
+  let cachedSamples = {};   // { tabName: [...first ~3 row objects] }
 
   // ── auth (same shape as drive-loader) ─────────────────────────────
   function waitFor(predicate, timeoutMs = 8000) {
@@ -138,8 +143,16 @@
     if (!res.ok) throw new Error(`Sheets fetch failed: ${res.status} ${res.statusText}`);
     const json = await res.json();
     const out = {};
+    cachedHeaders = {};
+    cachedSamples = {};
     (json.valueRanges || []).forEach((vr, i) => {
-      out[TAB_NAMES[i]] = rowsToObjects(vr.values || []);
+      const tabName = TAB_NAMES[i];
+      const rows = vr.values || [];
+      const headers = rows.length ? rows[0].map(h => String(h || '').trim()) : [];
+      const objects = rowsToObjects(rows, headers);
+      cachedHeaders[tabName] = headers;
+      cachedSamples[tabName] = objects.slice(0, 3);
+      out[tabName] = objects;
     });
     return out;
   }
@@ -147,9 +160,9 @@
   // Sheets returns arrays-of-arrays. Convert the first row to headers and
   // pad short rows so missing trailing cells become "" — matches PapaParse
   // header-mode behavior so buildFromRows can stay agnostic.
-  function rowsToObjects(rows) {
+  function rowsToObjects(rows, headersOverride) {
     if (!rows.length) return [];
-    const headers = rows[0].map(h => String(h || '').trim());
+    const headers = headersOverride || rows[0].map(h => String(h || '').trim());
     return rows.slice(1)
       .filter(r => r.some(cell => String(cell || '').trim() !== ''))
       .map(r => {
@@ -157,6 +170,61 @@
         headers.forEach((h, i) => { obj[h] = r[i] !== undefined ? String(r[i]) : ''; });
         return obj;
       });
+  }
+
+  // ── append (write path) ───────────────────────────────────────────
+  // Append rows to a tab. Uses the cached headers (populated by
+  // fetchAllTabs) to determine column order, so the row objects can use
+  // unordered key/value pairs and any unknown keys are silently ignored.
+  // Missing keys become empty cells.
+  //
+  // valueInputOption=USER_ENTERED so dates/numbers are interpreted by
+  // Sheets the same way as if the user typed them.
+  async function appendRows(tabName, rows) {
+    if (!accessToken) throw new Error('Not signed in');
+    if (!TAB_NAMES.includes(tabName)) throw new Error(`Unknown tab: ${tabName}`);
+    if (!Array.isArray(rows) || !rows.length) return { appended: 0 };
+    const sheetId = cachedSheetId || await findLedgerSheetId();
+    cachedSheetId = sheetId;
+    let headers = cachedHeaders[tabName];
+    if (!headers || !headers.length) {
+      // Fallback: fetch just the header row of this tab.
+      const r = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(tabName + '!1:1')}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (r.status === 401) { clearCachedToken(); throw new Error('AUTH_EXPIRED'); }
+      if (!r.ok) throw new Error(`Header fetch failed: ${r.status}`);
+      const j = await r.json();
+      headers = (j.values && j.values[0] || []).map(h => String(h || '').trim());
+      cachedHeaders[tabName] = headers;
+    }
+    if (!headers.length) throw new Error(`Tab "${tabName}" has no headers — was the migrator run?`);
+
+    const values = rows.map(row => headers.map(h => {
+      const v = row[h];
+      if (v === null || v === undefined) return '';
+      return typeof v === 'string' ? v : String(v);
+    }));
+
+    const url =
+      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}` +
+      `/values/${encodeURIComponent(tabName + '!A1')}:append` +
+      `?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ values, majorDimension: 'ROWS' }),
+    });
+    if (res.status === 401) { clearCachedToken(); throw new Error('AUTH_EXPIRED'); }
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Append to ${tabName} failed: ${res.status} ${text}`);
+    }
+    return { appended: values.length };
   }
 
   // ── transform rows → FinanceData shape (ported verbatim from CSV path) ──
@@ -183,18 +251,27 @@
       status: a.status,
     }));
 
+    // Bucket raw snapshots by account, keeping the full date (not just ym)
+    // so we can pick the most-recent snapshot per month deterministically.
+    // Earlier we sorted [ym, balance] tuples with default JS sort (string
+    // compare), which made the same-month winner depend on the string order
+    // of the balance — i.e. "150000" < "62190.71" lexicographically, so a
+    // larger newer balance was silently overwritten by a smaller older one.
     const perAcct = {};
     snapshotsRaw.forEach(s => {
-      const ym = (s.date || '').slice(0, 7);
+      const date = s.date || '';
       if (!perAcct[s.account_id]) perAcct[s.account_id] = [];
-      perAcct[s.account_id].push([ym, parseFloat(s.balance_native)]);
+      perAcct[s.account_id].push({ date, ym: date.slice(0, 7), balance: parseFloat(s.balance_native) });
     });
     const snapshots = [];
     accounts.forEach(acc => {
-      const list = (perAcct[acc.id] || []).slice().sort();
+      const list = (perAcct[acc.id] || []).slice().sort((a, b) => a.date.localeCompare(b.date));
       if (!list.length) return;
-      const firstYm = list[0][0];
-      const dict = Object.fromEntries(list);
+      const firstYm = list[0].ym;
+      // Build ym → balance, with the LATEST date per month winning (the loop
+      // is in ascending date order, so later writes overwrite earlier ones).
+      const dict = {};
+      list.forEach(item => { dict[item.ym] = item.balance; });
       let last = null;
       ALL_MONTHS.forEach(ym => {
         if (ym < firstYm) return;
@@ -354,8 +431,21 @@
     requestSignIn,
     loadCachedToken,
     loadDemoData,
+    appendRows,
+    getSheetId: () => cachedSheetId,
+    getCurrentToken: () => accessToken,
     getSheetUrl: () => cachedSheetId
       ? `https://docs.google.com/spreadsheets/d/${cachedSheetId}/edit`
       : null,
+    // Schema snapshot: headers + first few sample rows per tab. Sent to the
+    // Intake API so Claude can ground extraction in the actual sheet shape
+    // without the function having to re-read the Sheet itself.
+    getSchemaSnapshot: () => ({
+      tabs: TAB_NAMES.map(name => ({
+        name,
+        headers: cachedHeaders[name] || [],
+        samples: cachedSamples[name] || [],
+      })),
+    }),
   };
 })();
