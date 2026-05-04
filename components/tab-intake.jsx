@@ -79,11 +79,12 @@ async function postIntake(payload) {
   const accounts = (window.FinanceData?.ACCOUNTS || []).map(a => ({
     id: a.id, nickname: a.name, type: a.type, currency: a.currency,
   }));
+  const categories = window.FinanceData?.CATEGORIES || [];
   const googleToken = window.SheetsLoader?.getCurrentToken?.() || null;
   const res = await fetch('/api/intake', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...payload, sheetId, schema, accounts, googleToken }),
+    body: JSON.stringify({ ...payload, sheetId, schema, accounts, categories, googleToken }),
   });
   if (!res.ok) {
     const text = await res.text();
