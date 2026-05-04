@@ -1,8 +1,10 @@
 // Intake endpoint — receives content (text/image/pdf/csv) from the dashboard's
 // Intake tab, calls Claude to extract structured rows, returns them.
 //
-// Model: claude-opus-4-7 by default (adaptive thinking disabled — bounded
-// extraction doesn't need reasoning depth). Override with ANTHROPIC_MODEL.
+// Model: claude-haiku-4-5 by default (cheapest option — fine for bounded
+// extraction; per-receipt cost is ~$0.001). Override with ANTHROPIC_MODEL —
+// e.g. claude-sonnet-4-6 or claude-opus-4-7 if extraction quality drops on
+// tricky inputs.
 //
 // Auth: Anthropic API key from process.env.ANTHROPIC_API_KEY (Vercel env var).
 // Origin allowlist + Google token verification land in step 7.
@@ -24,7 +26,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 
-const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-4-7';
+const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5';
 const MAX_ROWS_PER_TAB = 100;
 
 const VALID_INCOME_TYPES = [
