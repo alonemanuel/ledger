@@ -1,10 +1,13 @@
 // Tab: Overview
 const { useState: useStateOv } = React;
 
-function KPICard({ label, value, sub, trend }) {
+function KPICard({ label, value, sub, trend, info }) {
   return (
     <div className="kpi">
-      <div className="kpi-label">{label}</div>
+      <div className="kpi-label">
+        <span>{label}</span>
+        {info && <span className="kpi-info-btn" title={info}><Icon name="info" size={10} strokeWidth={2}/></span>}
+      </div>
       <div className="kpi-value">{value}</div>
       {sub && <div className={`kpi-sub ${trend || ''}`}>{sub}</div>}
     </div>
@@ -88,10 +91,12 @@ function OverviewTab() {
   const nwPrev = Fin.netWorthAt(Fin.ALL_MONTHS[Fin.ALL_MONTHS.length - 2], accFilter);
   const delta = nw - nwPrev;
 
-  // Avg monthly (for cashflow side, not filtered by owner — household)
+  // Avg monthly — only count months that have actual data to avoid diluting with zero-filled months
   const inc12 = Fin.last12.reduce((s, ym) => s + Fin.incomeInMonth(ym), 0);
   const exp12 = Fin.last12.reduce((s, ym) => s + Fin.expenseInMonth(ym), 0);
-  const avgInc = inc12 / 12, avgExp = exp12 / 12;
+  const incFilledMonths = Fin.last12.filter(ym => Fin.incomeInMonth(ym) > 0).length || 1;
+  const expFilledMonths = Fin.last12.filter(ym => Fin.expenseInMonth(ym) > 0).length || 1;
+  const avgInc = inc12 / incFilledMonths, avgExp = exp12 / expFilledMonths;
 
   const groups = Fin.groupedAssets(Fin.LATEST, accFilter);
   const groupEntries = Object.entries(groups).filter(([, v]) => v > 0).map(([k, v]) => ({
@@ -119,8 +124,8 @@ function OverviewTab() {
       <div className="kpi-grid">
         <KPICard label="Net worth" value={Fin.fmtILS(nw)} sub={`${Fin.fmtSigned(delta)} MoM`} trend={delta >= 0 ? 'up' : 'down'}/>
         <KPICard label="Δ MoM" value={Fin.fmtSigned(delta, (v) => Fin.fmtILS(v, { compact: true }))} sub={`${((delta/nwPrev)*100).toFixed(2)}% change`} trend={delta >= 0 ? 'up' : 'down'}/>
-        <KPICard label="Avg monthly income" value={Fin.fmtILS(avgInc, { compact: true })} sub={`12-mo trailing`}/>
-        <KPICard label="Avg monthly spend" value={Fin.fmtILS(avgExp, { compact: true })} sub={`net ${Fin.fmtSigned(avgInc - avgExp, (v) => Fin.fmtILS(v, { compact: true }))} / mo`} trend={(avgInc - avgExp) >= 0 ? 'up' : 'down'}/>
+        <KPICard label="Avg monthly income" value={Fin.fmtILS(avgInc, { compact: true })} sub={`${incFilledMonths}-mo trailing`} info={`Average over ${incFilledMonths} month${incFilledMonths !== 1 ? 's' : ''} with data (out of last 12)`}/>
+        <KPICard label="Avg monthly spend" value={Fin.fmtILS(avgExp, { compact: true })} sub={`net ${Fin.fmtSigned(avgInc - avgExp, (v) => Fin.fmtILS(v, { compact: true }))} / mo`} trend={(avgInc - avgExp) >= 0 ? 'up' : 'down'} info={`Average over ${expFilledMonths} month${expFilledMonths !== 1 ? 's' : ''} with data (out of last 12)`}/>
       </div>
 
       <section className="panel">
