@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Ledger — CSV → Sheets migrator</title>
+  <style>
+    body { font: 14px/1.5 -apple-system, "Inter", sans-serif; max-width: 720px; margin: 40px auto; padding: 0 24px; color: #1a1a1a; background: #fafaf7; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    p.lede { color: #666; margin: 0 0 24px; }
+    button { font: inherit; padding: 10px 16px; border: 1px solid #1a1a1a; background: #1a1a1a; color: #fafaf7; border-radius: 4px; cursor: pointer; margin-right: 8px; }
+    button.ghost { background: transparent; color: #1a1a1a; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    pre { background: #fff; border: 1px solid #e0e0d8; border-radius: 4px; padding: 12px; overflow: auto; max-height: 360px; font: 12px/1.4 "JetBrains Mono", monospace; }
+    .row { padding: 6px 0; border-bottom: 1px dashed #e0e0d8; display: flex; justify-content: space-between; align-items: center; }
+    .ok { color: #2e7d32; }
+    .err { color: #c62828; }
+    .warn { color: #c77800; }
+    a { color: #1a1a1a; }
+    code { background: #f0efe7; padding: 1px 4px; border-radius: 3px; font: 12px "JetBrains Mono", monospace; }
+  </style>
+</head>
+<body>
+  <h1>CSV → Sheets migrator</h1>
+  <p class="lede">
+    One-shot tool. Reads <code>accounts.csv</code>, <code>snapshots.csv</code>, <code>income.csv</code>, <code>expenses.csv</code>
+    from your ledger Drive folder and writes them into a single Google Sheet (<code>ledger</code>) in the same folder, with one tab per CSV.
+    Re-runnable: existing sheets get rewritten, not duplicated.
+  </p>
+
+  <div>
+    <button id="run">Sign in & migrate</button>
+    <button id="open" class="ghost" disabled>Open sheet ↗</button>
+    <button id="signout" class="ghost">Sign out</button>
+  </div>
+
+  <h3>Log</h3>
+  <pre id="log">Ready.</pre>
+
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <script>
+    const CLIENT_ID = '524822374717-jun05s52km4co3h1b838r3qsip0850aa.apps.googleusercontent.com';
+    const FOLDER_ID = '1x3REt2-XYd73s1wH61MFRBPbs94e1NJN';
+    const SHEET_NAME = 'ledger';
+    const TAB_NAMES = ['accounts', 'snapshots', 'income', 'expenses'];
+    const CSV_NAMES = TAB_NAMES.map(n => n + '.csv');
+    const SCOPES = [
+      'https://www.googleapis.com/auth/drive.readonly',
+      'https://www.googleapis.com/auth/drive.file',
+      'https://www.googleapis.com/auth/spreadsheets',
+    ].join(' ');
+
+    let accessToken = null;
+    let tokenClient = null;
+    let lastSheetId = null;
+
+    const logEl = document.getElementById('log');
+    const log = (msg, cls = '') => {
+      const span = cls ? `<span class="${cls}">${msg}</span>` : msg;
+      logEl.innerHTML += '\n' + span;
+      logEl.scrollTop = logEl.scrollHeight;
+    };
+
+    function waitFor(pred, ms = 8000) {
+      return new Promise((res, rej) => {
+        const start = Date.now();
+        (function check() {
+          if (pred()) return res();
+          if (Date.now() - start > ms) return rej(new Error('Timeout waiting for library'));
+          setTimeout(check, 50);
+        })();
+      });
+    }
+
+    async function signIn() {
+      await waitFor(() => window.google?.accounts?.oauth2);
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: () => {},
+      });
+      return new Promise((resolve, reject) => {
+        tokenClient.callback = (r) => {
+          if (r.error) return reject(new Error(r.error));
+          accessToken = r.access_token;
+          resolve();
+        };
+        tokenClient.error_callback = (err) => reject(new Error(err?.type || 'oauth error'));
+        tokenClient.requestAccessToken({ prompt: 'consent' });
+      });
+    }
+
+    async function api(url, opts = {}) {
+      const res = await fetch(url, {
+        ...opts,
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          ...(opts.headers || {}),
+        },
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${opts.method || 'GET'} ${url}\n  ${res.status}: ${text}`);
+      }
+      return res.json();
+    }
+
+    async function listFolderFiles() {
+      const q = encodeURIComponent(`'${FOLDER_ID}' in parents and trashed=false`);
+      const url = `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType)&pageSize=100`;
+      const json = await api(url);
+      return json.files || [];
+    }
+
+    async function downloadCsv(fileId) {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!res.ok) throw new Error(`download ${fileId}: ${res.status}`);
+      return await res.text();
+    }
+
+    function csvToValues(text) {
+      const r = Papa.parse(text, { header: false, skipEmptyLines: true });
+      // Returns array-of-arrays. First row is headers.
+      return r.data;
+    }
+
+    async function findOrCreateSheet() {
+      // Search for existing "ledger" sheet in folder
+      const q = encodeURIComponent(
+        `'${FOLDER_ID}' in parents and trashed=false ` +
+        `and mimeType='application/vnd.google-apps.spreadsheet' ` +
+        `and name='${SHEET_NAME}'`
+      );
+      const list = await api(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`);
+      if (list.files && list.files.length) {
+        log(`Found existing "${SHEET_NAME}" sheet: ${list.files[0].id}`, 'warn');
+        return list.files[0].id;
+      }
+      // Create new sheet directly in the folder via Drive API.
+      log(`Creating new "${SHEET_NAME}" sheet in folder...`);
+      const created = await api('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: SHEET_NAME,
+          mimeType: 'application/vnd.google-apps.spreadsheet',
+          parents: [FOLDER_ID],
+        }),
+      });
+      return created.id;
+    }
+
+    async function ensureTabsAndClear(sheetId) {
+      // Get current sheet structure
+      const meta = await api(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets(properties(sheetId,title))`);
+      const existing = (meta.sheets || []).map(s => s.properties);
+      const existingByTitle = Object.fromEntries(existing.map(p => [p.title, p]));
+
+      const requests = [];
+      // Add missing tabs
+      TAB_NAMES.forEach(name => {
+        if (!existingByTitle[name]) {
+          requests.push({ addSheet: { properties: { title: name } } });
+        }
+      });
+      // Drop the default "Sheet1" if it's still there and not one of ours
+      existing.forEach(p => {
+        if (!TAB_NAMES.includes(p.title)) {
+          // Only delete if there will still be at least one sheet after adds.
+          // We always keep the 4 named tabs after this batch, so safe to remove.
+          requests.push({ deleteSheet: { sheetId: p.sheetId } });
+        }
+      });
+      if (requests.length) {
+        await api(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}:batchUpdate`, {
+          method: 'POST',
+          body: JSON.stringify({ requests }),
+        });
+      }
+      // Clear all four tabs
+      await api(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values:batchClear`, {
+        method: 'POST',
+        body: JSON.stringify({ ranges: TAB_NAMES.map(n => `${n}!A:Z`) }),
+      });
+    }
+
+    async function writeTab(sheetId, tabName, values) {
+      const range = encodeURIComponent(`${tabName}!A1`);
+      await api(
+        `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?valueInputOption=RAW`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ values, majorDimension: 'ROWS' }),
+        }
+      );
+    }
+
+    async function migrate() {
+      logEl.textContent = '';
+      log('Signing in...');
+      await signIn();
+      log('Signed in.', 'ok');
+
+      log(`Listing folder ${FOLDER_ID}...`);
+      const files = await listFolderFiles();
+      const byName = Object.fromEntries(files.map(f => [f.name, f]));
+      const missing = CSV_NAMES.filter(n => !byName[n]);
+      if (missing.length) throw new Error(`Missing CSVs: ${missing.join(', ')}`);
+      log(`Found ${CSV_NAMES.length} CSVs.`, 'ok');
+
+      log('Downloading CSVs...');
+      const csvs = {};
+      for (const name of CSV_NAMES) {
+        const text = await downloadCsv(byName[name].id);
+        csvs[name] = csvToValues(text);
+        log(`  ${name}: ${csvs[name].length} rows (incl. header)`);
+      }
+
+      log('Finding/creating sheet...');
+      const sheetId = await findOrCreateSheet();
+      lastSheetId = sheetId;
+      log(`Sheet id: ${sheetId}`, 'ok');
+
+      log('Ensuring tabs + clearing existing values...');
+      await ensureTabsAndClear(sheetId);
+
+      log('Writing tabs...');
+      for (let i = 0; i < CSV_NAMES.length; i++) {
+        const tab = TAB_NAMES[i];
+        const csvName = CSV_NAMES[i];
+        await writeTab(sheetId, tab, csvs[csvName]);
+        log(`  ${tab} ← ${csvName}`, 'ok');
+      }
+
+      log('\n✓ Migration complete.', 'ok');
+      log(`  https://docs.google.com/spreadsheets/d/${sheetId}/edit`);
+      const openBtn = document.getElementById('open');
+      openBtn.disabled = false;
+      openBtn.onclick = () => window.open(`https://docs.google.com/spreadsheets/d/${sheetId}/edit`, '_blank');
+    }
+
+    document.getElementById('run').onclick = async () => {
+      const btn = document.getElementById('run');
+      btn.disabled = true;
+      try {
+        await migrate();
+      } catch (e) {
+        log('\nERROR: ' + e.message, 'err');
+        console.error(e);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+
+    document.getElementById('signout').onclick = () => {
+      if (accessToken && window.google?.accounts?.oauth2) {
+        google.accounts.oauth2.revoke(accessToken, () => {});
+      }
+      accessToken = null;
+      log('Signed out.');
+    };
+  </script>
+</body>
+</html>

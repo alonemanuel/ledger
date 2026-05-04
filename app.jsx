@@ -118,6 +118,18 @@ function App() {
           <span className="brand-sub">Alon &amp; Amit · personal finance</span>
         </div>
         <div className="header-actions">
+          {window.SheetsLoader?.getSheetUrl?.() && (
+            <a
+              className="theme-toggle"
+              href={window.SheetsLoader.getSheetUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Open ledger Sheet in a new tab"
+              title="Open ledger Sheet in a new tab"
+            >
+              <Icon name="external" size={16}/>
+            </a>
+          )}
           <button
             className="theme-toggle"
             onClick={() => setTweak('privacy', !t.privacy)}
@@ -175,8 +187,8 @@ function Bootstrap() {
       // Initialize GIS before showing the signin button so the click
       // handler can call requestAccessToken synchronously and Chrome
       // doesn't classify the OAuth window as a programmatic popup.
-      await window.DriveLoader.init();
-      await window.DriveLoader.bootstrap();
+      await window.SheetsLoader.init();
+      await window.SheetsLoader.bootstrap();
       setTick(x => x + 1); setPhase('ready');
     } catch (e) {
       if (e.message === 'NEEDS_SIGNIN') {
@@ -190,8 +202,8 @@ function Bootstrap() {
   const handleSignIn = async () => {
     setError(null); setPhase('fetching');
     try {
-      await window.DriveLoader.requestSignIn();
-      await window.DriveLoader.fetchAndPopulate();
+      await window.SheetsLoader.requestSignIn();
+      await window.SheetsLoader.fetchAndPopulate();
       setTick(x => x + 1); setPhase('ready');
     } catch (e) {
       if (e.message === 'POPUP_BLOCKED') {
@@ -216,14 +228,14 @@ function Bootstrap() {
       <div className="boot-card">
         <div className="boot-mark">◐</div>
         <div className="boot-title">Ledger</div>
-        <div className="boot-sub">Personal finance · live from Google Drive</div>
+        <div className="boot-sub">Personal finance · live from Google Sheets</div>
 
         {phase === 'loading' && <div className="boot-status">Loading…</div>}
 
         {phase === 'fetching' && (
           <div className="boot-status">
             <div className="boot-spinner"/>
-            <div>Fetching CSVs from Drive…</div>
+            <div>Fetching from Google Sheets…</div>
           </div>
         )}
 
@@ -238,7 +250,7 @@ function Bootstrap() {
             <button className="boot-btn boot-btn-ghost" onClick={async () => {
               setError(null); setPhase('fetching');
               try {
-                await window.DriveLoader.loadDemoData();
+                await window.SheetsLoader.loadDemoData();
                 setTick(x => x + 1); setPhase('ready');
               } catch (e) {
                 setError(e.message || String(e)); setPhase('error');
@@ -251,7 +263,7 @@ function Bootstrap() {
           <>
             <div className="boot-error">⚠ {error}</div>
             <button className="boot-btn" onClick={start}>Retry</button>
-            <button className="boot-btn boot-btn-ghost" onClick={() => { window.DriveLoader.signOut(); start(); }}>Sign out & retry</button>
+            <button className="boot-btn boot-btn-ghost" onClick={() => { window.SheetsLoader.signOut(); start(); }}>Sign out & retry</button>
           </>
         )}
       </div>
