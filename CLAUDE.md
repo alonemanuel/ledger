@@ -22,9 +22,11 @@ DRIVE_DATA_DIR=/path/to/csvs python scripts/generate_data.py   # override defaul
 python scripts/bundle.py            # live mode — empty data scaffold + sheets-loader.js (auth at runtime)
 python scripts/bundle.py --example  # synthetic demo mode — inlines data.example.js, skips Bootstrap auth flow
 
-# Deploy
-wrangler pages deploy dist --project-name=alon-ledger
+# Deploy (Vercel — static hosting of dist/)
+vercel deploy --prod dist
 ```
+
+The site is hosted on **Vercel** as a static deployment of the bundled `dist/` directory. No build step runs on Vercel — `bundle.py` produces a self-contained `dist/index.html` locally, and Vercel just serves it. There is no `vercel.json`, no framework preset, no serverless functions.
 
 There are no lint, type-check, or test commands — none are configured.
 
@@ -89,7 +91,7 @@ After updating data in the `ledger` Sheet: just **refresh the deployed page** �
 
 ```bash
 python scripts/bundle.py
-wrangler pages deploy dist --project-name=alon-ledger
+vercel deploy --prod dist
 ```
 
 See `SETUP.md` for OAuth setup details and the one-time CSV→Sheets migration (Client ID and Folder ID are baked into `data/sheets-loader.js`) and `DEPLOY.md` for hosting alternatives.
