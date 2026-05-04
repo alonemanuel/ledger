@@ -95,7 +95,7 @@ function genIncome() {
   for (let y = 2024; y <= 2026; y++) {
     for (let m = 1; m <= 12; m++) {
       if (y === 2024 && m < 5) continue;
-      if (y === 2026 && m > 5) continue;
+      if (y === 2026 && m > 4) continue; // current month not yet complete
       months.push(`${y}-${String(m).padStart(2,'0')}`);
     }
   }
@@ -151,7 +151,7 @@ function genExpenses() {
   for (let y = 2024; y <= 2026; y++) {
     for (let m = 1; m <= 12; m++) {
       if (y === 2024 && m < 5) continue;
-      if (y === 2026 && m > 5) continue;
+      if (y === 2026 && m > 4) continue; // current month not yet complete
       months.push(`${y}-${String(m).padStart(2,'0')}`);
     }
   }
