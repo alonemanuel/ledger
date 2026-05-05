@@ -1,5 +1,7 @@
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { Fin } from '../data/helpers.js';
+import { Icon } from './icons.jsx';
 // Hand-rolled SVG chart primitives for the dashboard.
-const { useState, useMemo, useRef, useEffect } = React;
 
 // ── TIME RANGE FILTER ──────────────────────────────────────────────────────
 function TimeRangeFilter({ value, onChange, options = Fin.RANGE_OPTIONS }) {
@@ -444,4 +446,4 @@ function Treemap({ items, height = 320 }) {
   );
 }
 
-Object.assign(window, { LineChart, StackedBar, PairedBars, Donut, Sparkline, Treemap });
+export { TimeRangeFilter, LineChart, StackedBar, PairedBars, Donut, Sparkline, Treemap };

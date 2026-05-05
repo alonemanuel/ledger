@@ -1,5 +1,17 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import ReactDOM from 'react-dom/client';
+import './styles.css';
+import './data/data.js';
+import { Fin } from './data/helpers.js';
+import './data/db-loader.js';
+import { useTweaks, TweaksPanel, TweakSection, TweakToggle, TweakRadio, TweakSelect } from './tweaks-panel.jsx';
+import { Icon } from './components/icons.jsx';
+import { OverviewTab } from './components/tab-overview.jsx';
+import { AccountsTab } from './components/tab-accounts.jsx';
+import { CashflowTab } from './components/tab-cashflow.jsx';
+import { PassiveTab } from './components/tab-passive.jsx';
+import { IntakeTab } from './components/tab-intake.jsx';
 // Main app — shell, header, FX strip, tabs.
-const { useState, useEffect, useMemo } = React;
 
 /* ── ErrorBoundary ────────────────────────────────────────────────────── */
 class ErrorBoundary extends React.Component {
@@ -43,8 +55,6 @@ class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
-window.ErrorBoundary = ErrorBoundary;
-
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "dark": false,
   "density": "regular",
@@ -305,4 +315,26 @@ function Bootstrap() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<Bootstrap/>);
+const isExample = import.meta.env.VITE_EXAMPLE_MODE === 'true';
+
+import { ACCOUNTS, SNAPSHOTS, INCOME, EXPENSES, FX } from './data/data.js';
+
+async function mount() {
+  if (isExample) {
+    await import('./data/data.example.js');
+    const ex = window.FinanceData;
+    ACCOUNTS.length = 0; ACCOUNTS.push(...ex.ACCOUNTS);
+    SNAPSHOTS.length = 0; SNAPSHOTS.push(...ex.SNAPSHOTS);
+    INCOME.length = 0; INCOME.push(...ex.INCOME);
+    EXPENSES.length = 0; EXPENSES.push(...ex.EXPENSES);
+    Object.keys(FX.byMonth).forEach(k => delete FX.byMonth[k]);
+    Object.assign(FX.byMonth, ex.FX.byMonth);
+    FX.current = ex.FX.current;
+    FX.setOn = ex.FX.setOn;
+    Fin.rebuildDerivations();
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    isExample ? <App/> : <Bootstrap/>
+  );
+}
+mount();

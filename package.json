@@ -5,17 +5,23 @@
   "description": "Personal finance dashboard — single-file HTML, React, SVG charts.",
   "type": "module",
   "scripts": {
-    "build": "python3 scripts/bundle.py",
-    "build:example": "python3 scripts/bundle.py --example",
+    "dev": "vite",
+    "build": "vite build",
+    "build:example": "VITE_EXAMPLE_MODE=true vite build",
+    "preview": "vite preview",
     "test": "node scripts/smoke.mjs",
     "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.0.0",
-    "@neondatabase/serverless": "^1.1.0"
+    "@neondatabase/serverless": "^1.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@vitejs/plugin-react": "^4.7.0",
     "playwright": "^1.49.0",
+    "vite": "^6.4.2",
     "xlsx": "^0.18.5"
   }
 }

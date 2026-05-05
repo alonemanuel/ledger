@@ -7,36 +7,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="styles.css"/>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
   <div id="root"></div>
-
-  <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <!-- SheetJS — used by the Intake tab to convert XLSX uploads to CSV in the browser. -->
-  <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
-  <!-- data scaffold + helpers (plain JS, run before babel scripts so they're on window) -->
-  <script src="data/data.js"></script>
-  <script src="data/helpers.js"></script>
-  <script src="data/db-loader.js"></script>
-
-  <!-- Tweaks panel (defines TweaksPanel, useTweaks, TweakSlider, etc.) -->
-  <script type="text/babel" src="tweaks-panel.jsx"></script>
-
-  <!-- Charts + tab components -->
-  <script type="text/babel" src="components/icons.jsx"></script>
-  <script type="text/babel" src="components/charts.jsx"></script>
-  <script type="text/babel" src="components/tab-overview.jsx"></script>
-  <script type="text/babel" src="components/tab-accounts.jsx"></script>
-  <script type="text/babel" src="components/tab-cashflow.jsx"></script>
-  <script type="text/babel" src="components/tab-passive.jsx"></script>
-  <script type="text/babel" src="components/tab-intake.jsx"></script>
-
-  <!-- App -->
-  <script type="text/babel" src="app.jsx"></script>
+  <script type="module" src="/app.jsx"></script>
 </body>
 </html>

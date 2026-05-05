@@ -1,5 +1,9 @@
+import React, { useState as useStateCf } from 'react';
+import { Fin } from '../data/helpers.js';
+import { CATEGORIES } from '../data/data.js';
+import { Icon, CAT_ICON } from './icons.jsx';
+import { PairedBars, StackedBar, Treemap } from './charts.jsx';
 // Tab: Cashflow
-const { useState: useStateCf } = React;
 
 const CF_SAVINGS_LS = 'ledger_cashflow_show_savings';
 
@@ -267,4 +271,4 @@ function CashflowTab() {
   );
 }
 
-window.CashflowTab = CashflowTab;
+export { CashflowTab };

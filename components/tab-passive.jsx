@@ -1,5 +1,8 @@
+import React, { useState as useStatePi, useMemo as useMemoPi } from 'react';
+import { Fin } from '../data/helpers.js';
+import { Icon, ACC_TYPE_ICON } from './icons.jsx';
+import { StackedBar } from './charts.jsx';
 // Tab: Passive Income
-const { useState: useStatePi, useMemo: useMemoPi } = React;
 
 function PassiveTab() {
   const [windowMonths, setWindowMonths] = useStatePi(12);
@@ -144,4 +147,4 @@ function PassiveTab() {
   );
 }
 
-window.PassiveTab = PassiveTab;
+export { PassiveTab };

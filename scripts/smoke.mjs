@@ -25,10 +25,14 @@ const MIME = {
 };
 
 async function build() {
-  console.log('▸ Building example bundle…');
+  console.log('▸ Building with Vite…');
   await new Promise((res, rej) => {
-    const p = spawn('python3', ['scripts/bundle.py', '--example'], { cwd: REPO, stdio: 'inherit' });
-    p.on('exit', code => code === 0 ? res() : rej(new Error(`bundle.py exit ${code}`)));
+    const p = spawn('npx', ['vite', 'build'], {
+      cwd: REPO,
+      stdio: 'inherit',
+      env: { ...process.env, VITE_EXAMPLE_MODE: 'true' },
+    });
+    p.on('exit', code => code === 0 ? res() : rej(new Error(`vite build exit ${code}`)));
   });
   if (!existsSync(join(DIST, 'index.html'))) throw new Error('dist/index.html missing after build');
 }
@@ -69,8 +73,7 @@ async function run() {
 
   console.log('▸ Loading in headless Chromium…');
   await page.goto(url, { waitUntil: 'networkidle' });
-  // Babel compiles in-browser; give it a beat.
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(1000);
 
   const rootText = await page.evaluate(() => document.getElementById('root')?.innerText || '');
   const screenshot = await page.screenshot({ fullPage: false });

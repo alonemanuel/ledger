@@ -1,7 +1,9 @@
+import React, { useState as useStateAcc, useMemo as useMemoAcc } from 'react';
+import { Fin } from '../data/helpers.js';
+import { ACCOUNTS as ACCS_ACC, TYPE_GROUP as TG_ACC, TYPE_ICON as TI_ACC } from '../data/data.js';
+import { Icon, ACC_TYPE_ICON } from './icons.jsx';
+import { LineChart, Sparkline, TimeRangeFilter } from './charts.jsx';
 // Tab: Accounts & Net Worth
-const { useState: useStateAcc, useMemo: useMemoAcc } = React;
-
-const { TYPE_GROUP: TG_ACC, TYPE_ICON: TI_ACC, ACCOUNTS: ACCS_ACC } = window.FinanceData;
 
 function StatusDot({ status }) {
   return <span className={`status-dot status-${status}`} title={status}></span>;
@@ -157,4 +159,4 @@ function AccountsTab({ primaryCurrency, openAccountId, onOpenAccount, onCloseAcc
   );
 }
 
-window.AccountsTab = AccountsTab;
+export { AccountsTab };
