@@ -4,6 +4,8 @@ import './styles.css';
 import './data/data.js';
 import { Fin } from './data/helpers.js';
 import './data/db-loader.js';
+import demoSource from './data/data.example.js?raw';
+window.__LEDGER_DEMO_SOURCE__ = demoSource;
 import { useTweaks, TweaksPanel, TweakSection, TweakToggle, TweakRadio, TweakSelect } from './tweaks-panel.jsx';
 import { Icon } from './components/icons.jsx';
 import { OverviewTab } from './components/tab-overview.jsx';
