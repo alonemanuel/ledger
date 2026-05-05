@@ -6,7 +6,7 @@ import { Fin } from './data/helpers.js';
 import './data/db-loader.js';
 import demoSource from './data/data.example.js?raw';
 window.__LEDGER_DEMO_SOURCE__ = demoSource;
-import { useTweaks, TweaksPanel, TweakSection, TweakToggle, TweakRadio, TweakSelect } from './tweaks-panel.jsx';
+import { useTweaks } from './tweaks-panel.jsx';
 import { Icon } from './components/icons.jsx';
 import { OverviewTab } from './components/tab-overview.jsx';
 import { AccountsTab } from './components/tab-accounts.jsx';
@@ -164,10 +164,6 @@ function App() {
     document.documentElement.style.setProperty('--accent-2', palette.accent2);
   }, [t.dark, t.density, t.privacy, t.accent]);
 
-  const openTweaks = () => {
-    window.postMessage({ type: '__activate_edit_mode' }, '*');
-  };
-
   const sidebarWidth = sidebar.isMobile ? 0
     : sidebar.collapsed ? SIDEBAR_RAIL : SIDEBAR_WIDTH;
 
@@ -189,16 +185,6 @@ function App() {
           <span className="brand-sub">Alon &amp; Amit · personal finance</span>
         </div>
         <div className="header-actions">
-          {!sidebar.isMobile && (
-            <button
-              className="theme-toggle"
-              onClick={sidebar.toggle}
-              aria-label={sidebar.collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              title={sidebar.collapsed ? 'Expand sidebar (⌘B)' : 'Collapse sidebar (⌘B)'}
-            >
-              <Icon name="panelLeft" size={16}/>
-            </button>
-          )}
           <button
             className="theme-toggle"
             onClick={() => setTweak('privacy', !t.privacy)}
@@ -225,7 +211,6 @@ function App() {
           section={section}
           onNavigate={navigate}
           sidebar={sidebar}
-          onOpenTweaks={openTweaks}
         />
         <main className="app-main" style={{ marginLeft: sidebarWidth }}>
           {tab === 'overview' && <OverviewTab key={`overview-${dataTick}`} section={section}/>}
@@ -236,16 +221,6 @@ function App() {
         </main>
       </div>
 
-      <TweaksPanel>
-        <TweakSection label="Theme"/>
-        <TweakToggle label="Dark mode" value={t.dark} onChange={v => setTweak('dark', v)}/>
-        <TweakRadio label="Density" value={t.density} options={['compact','regular']} onChange={v => setTweak('density', v)}/>
-        <TweakSelect label="Accent" value={t.accent} options={['ochre','terracotta','ink','moss']} onChange={v => setTweak('accent', v)}/>
-        <TweakSection label="Display"/>
-        <TweakRadio label="Currency primary" value={t.primaryCurrency} options={['ILS','USD','native']} onChange={v => setTweak('primaryCurrency', v)}/>
-        <TweakToggle label="Pension detail groups" value={t.groupDetails} onChange={v => setTweak('groupDetails', v)}/>
-        <TweakToggle label="Privacy mode (hide ₪)" value={t.privacy} onChange={v => setTweak('privacy', v)}/>
-      </TweaksPanel>
     </div>
   );
 }

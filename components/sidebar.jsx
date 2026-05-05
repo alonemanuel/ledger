@@ -61,7 +61,7 @@ function useSidebar() {
   return { collapsed, mobileOpen, isMobile, toggle, setMobileOpen };
 }
 
-function Sidebar({ tab, section, onNavigate, sidebar, onOpenTweaks }) {
+function Sidebar({ tab, section, onNavigate, sidebar }) {
   const { collapsed, mobileOpen, isMobile, toggle, setMobileOpen } = sidebar;
   const [expandedGroups, setExpandedGroups] = useState(() => {
     const groups = {};
@@ -125,16 +125,18 @@ function Sidebar({ tab, section, onNavigate, sidebar, onOpenTweaks }) {
           })}
         </nav>
       </div>
-      <div className="sb-footer">
-        <button
-          className="sb-item"
-          onClick={onOpenTweaks}
-          title={collapsed && !isMobile ? 'Settings' : undefined}
-        >
-          <span className="sb-item-icon"><Icon name="settings" size={18}/></span>
-          <span className="sb-item-label">Settings</span>
-        </button>
-      </div>
+      {!isMobile && (
+        <div className="sb-footer">
+          <button
+            className="sb-item"
+            onClick={toggle}
+            title={collapsed ? 'Expand sidebar (⌘B)' : 'Collapse sidebar (⌘B)'}
+          >
+            <span className="sb-item-icon"><Icon name="panelLeft" size={18}/></span>
+            <span className="sb-item-label">Collapse</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 
