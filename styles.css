@@ -469,6 +469,55 @@ body {
 .cat-legend li { grid-template-columns: 10px 14px 1fr; }
 .cat-legend li svg { color: var(--ink-3); }
 
+/* ── Month picker ─────────────────────────────────────────────────────── */
+.month-picker {
+  display: flex; align-items: center; justify-content: center; gap: 16px;
+  margin: 24px 0 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--rule);
+}
+.month-picker-label {
+  font-family: var(--font-serif);
+  font-size: 20px; font-weight: 500;
+  letter-spacing: -0.02em;
+  min-width: 100px; text-align: center;
+}
+.month-picker-arrow {
+  appearance: none; border: 1px solid var(--rule);
+  background: var(--panel); color: var(--ink-2);
+  width: 32px; height: 32px;
+  border-radius: 4px; cursor: pointer;
+  font-size: 18px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: color .12s, border-color .12s;
+}
+.month-picker-arrow:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-3); }
+.month-picker-arrow:disabled { opacity: 0.3; cursor: default; }
+
+/* ── Month summary strip ──────────────────────────────────────────────── */
+.month-summary {
+  display: flex; gap: 24px; justify-content: center;
+  margin-bottom: var(--gap);
+  padding: 10px 16px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+.month-summary-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.month-summary-label {
+  font-size: 10px; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--ink-3);
+}
+.month-summary-value {
+  font-family: var(--font-mono); font-size: 14px;
+  font-weight: 500; color: var(--ink);
+}
+
+@media (max-width: 600px) {
+  .month-summary { gap: 12px; flex-wrap: wrap; }
+  .month-picker-label { font-size: 16px; min-width: 80px; }
+}
+
 /* ── Treemap ───────────────────────────────────────────────────────────── */
 .treemap-wrap { width: 100%; }
 .treemap { display: block; width: 100%; height: auto; }

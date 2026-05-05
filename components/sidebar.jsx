@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Icon } from './icons.jsx';
+import { CASHFLOW_SECTIONS } from './tab-cashflow.tsx';
 
 const SIDEBAR_LS_KEY = 'ledger_sidebar_collapsed';
 const SIDEBAR_WIDTH = 220;
@@ -9,11 +10,7 @@ const MOBILE_BP = 768;
 const NAV_ITEMS = [
   { id: 'overview',  label: 'Overview',        icon: 'grid' },
   { id: 'accounts',  label: 'Accounts',        icon: 'wallet' },
-  { id: 'cashflow',  label: 'Cashflow',        icon: 'trendingUp', children: [
-    { id: 'ive',        label: 'Income vs Expenses' },
-    { id: 'categories', label: 'Categories' },
-    { id: 'details',    label: 'Details' },
-  ]},
+  { id: 'cashflow',  label: 'Cashflow',        icon: 'trendingUp', children: CASHFLOW_SECTIONS },
   { id: 'passive',   label: 'Passive Income',  icon: 'percent' },
   { id: 'intake',    label: 'Intake',          icon: 'upload' },
 ];
@@ -76,6 +73,12 @@ function Sidebar({ tab, section, onNavigate, sidebar }) {
   const handleNav = (tabId, sectionId) => {
     onNavigate(tabId, sectionId || null);
     if (isMobile) setMobileOpen(false);
+    if (sectionId) {
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-section="${sectionId}"]`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
   };
 
   const sidebarContent = (
