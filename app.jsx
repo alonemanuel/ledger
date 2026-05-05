@@ -13,7 +13,8 @@ import { AccountsTab } from './components/tab-accounts.jsx';
 import { CashflowTab } from './components/tab-cashflow.jsx';
 import { PassiveTab } from './components/tab-passive.jsx';
 import { IntakeTab } from './components/tab-intake.jsx';
-// Main app — shell, header, FX strip, tabs.
+import { Sidebar, useSidebar, SIDEBAR_WIDTH, SIDEBAR_RAIL } from './components/sidebar.jsx';
+// Main app — shell, header, sidebar, content.
 
 /* ── ErrorBoundary ────────────────────────────────────────────────────── */
 class ErrorBoundary extends React.Component {
@@ -111,47 +112,49 @@ function parseUrl() {
   const segs = location.pathname.split('/').filter(Boolean);
   const tab = TAB_IDS.includes(segs[0]) ? segs[0] : 'overview';
   const accountId = (tab === 'accounts' && segs[1]) ? decodeURIComponent(segs[1]) : null;
-  return { tab, accountId };
+  const section = location.hash ? location.hash.slice(1) : null;
+  return { tab, accountId, section };
 }
 
-function pathFor(tab, accountId) {
-  if (tab === 'accounts' && accountId) return `/accounts/${encodeURIComponent(accountId)}`;
-  if (tab === 'overview') return '/';
-  return `/${tab}`;
+function pathFor(tab, accountId, section) {
+  let path;
+  if (tab === 'accounts' && accountId) path = `/accounts/${encodeURIComponent(accountId)}`;
+  else if (tab === 'overview') path = '/';
+  else path = `/${tab}`;
+  if (section) path += `#${section}`;
+  return path;
 }
 
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const [{ tab, accountId }, setRoute] = useState(parseUrl);
+  const [{ tab, accountId, section }, setRoute] = useState(parseUrl);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualRate, setManualRate] = useState(window.FinanceData.FX.current);
-  // Bumped after a successful Intake; keys the data-driven tabs so they
-  // re-mount and re-derive from the freshly populated FinanceData.
   const [dataTick, setDataTick] = useState(0);
+  const sidebar = useSidebar();
 
-  const goTab = (id) => setRoute({ tab: id, accountId: null });
-  const openAccount = (id) => setRoute({ tab: 'accounts', accountId: id });
-  const closeAccount = () => setRoute({ tab: 'accounts', accountId: null });
+  const navigate = (tabId, sectionId) => {
+    setRoute({ tab: tabId, accountId: null, section: sectionId });
+  };
+  const openAccount = (id) => setRoute({ tab: 'accounts', accountId: id, section: null });
+  const closeAccount = () => setRoute({ tab: 'accounts', accountId: null, section: null });
 
-  // apply manual rate
   useEffect(() => { window.FinanceData.FX.current = manualRate; }, [manualRate]);
 
-  // persist route in path
   useEffect(() => {
-    const want = pathFor(tab, accountId);
-    if (location.pathname !== want) {
-      history.pushState({ tab, accountId }, '', want);
+    const want = pathFor(tab, accountId, section);
+    const current = location.pathname + (location.hash || '');
+    if (current !== want) {
+      history.pushState({ tab, accountId, section }, '', want);
     }
-  }, [tab, accountId]);
+  }, [tab, accountId, section]);
 
-  // back/forward navigation
   useEffect(() => {
     const onPop = () => setRoute(parseUrl());
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  // theme
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', t.dark ? 'dark' : 'light');
     document.documentElement.setAttribute('data-density', t.density);
@@ -161,23 +164,41 @@ function App() {
     document.documentElement.style.setProperty('--accent-2', palette.accent2);
   }, [t.dark, t.density, t.privacy, t.accent]);
 
-  const tabs = [
-    { id: 'overview',  label: 'Overview' },
-    { id: 'accounts',  label: 'Accounts' },
-    { id: 'cashflow',  label: 'Cashflow' },
-    { id: 'passive',   label: 'Passive Income' },
-    { id: 'intake',    label: 'Intake' },
-  ];
+  const openTweaks = () => {
+    window.postMessage({ type: '__activate_edit_mode' }, '*');
+  };
+
+  const sidebarWidth = sidebar.isMobile ? 0
+    : sidebar.collapsed ? SIDEBAR_RAIL : SIDEBAR_WIDTH;
 
   return (
-    <div className="app">
+    <div className="app app-with-sidebar">
       <header className="app-h">
+        {sidebar.isMobile && (
+          <button
+            className="theme-toggle sb-menu-btn"
+            onClick={sidebar.toggle}
+            aria-label="Toggle menu"
+          >
+            <Icon name="menu" size={18}/>
+          </button>
+        )}
         <div className="brand">
           <span className="brand-mark">◐</span>
           <span className="brand-name">Ledger</span>
           <span className="brand-sub">Alon &amp; Amit · personal finance</span>
         </div>
         <div className="header-actions">
+          {!sidebar.isMobile && (
+            <button
+              className="theme-toggle"
+              onClick={sidebar.toggle}
+              aria-label={sidebar.collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={sidebar.collapsed ? 'Expand sidebar (⌘B)' : 'Collapse sidebar (⌘B)'}
+            >
+              <Icon name="panelLeft" size={16}/>
+            </button>
+          )}
           <button
             className="theme-toggle"
             onClick={() => setTweak('privacy', !t.privacy)}
@@ -196,20 +217,24 @@ function App() {
           </button>
           <FxStrip rate={manualRate} manualOpen={manualOpen} setManualOpen={setManualOpen} manualRate={manualRate} setManualRate={setManualRate}/>
         </div>
-        <nav className="app-nav">
-          {tabs.map(tt => (
-            <button key={tt.id} data-screen-label={tt.label} className={tab === tt.id ? 'on' : ''} onClick={() => goTab(tt.id)}>{tt.label}</button>
-          ))}
-        </nav>
       </header>
 
-      <main className="app-main">
-        {tab === 'overview' && <OverviewTab key={`overview-${dataTick}`}/>}
-        {tab === 'accounts' && <AccountsTab key={`accounts-${dataTick}`} primaryCurrency={t.primaryCurrency} openAccountId={accountId} onOpenAccount={openAccount} onCloseAccount={closeAccount}/>}
-        {tab === 'cashflow' && <CashflowTab key={`cashflow-${dataTick}`}/>}
-        {tab === 'passive' && <PassiveTab key={`passive-${dataTick}`}/>}
-        {tab === 'intake' && <IntakeTab onIngested={() => setDataTick(x => x + 1)}/>}
-      </main>
+      <div className="app-body">
+        <Sidebar
+          tab={tab}
+          section={section}
+          onNavigate={navigate}
+          sidebar={sidebar}
+          onOpenTweaks={openTweaks}
+        />
+        <main className="app-main" style={{ marginLeft: sidebarWidth }}>
+          {tab === 'overview' && <OverviewTab key={`overview-${dataTick}`} section={section}/>}
+          {tab === 'accounts' && <AccountsTab key={`accounts-${dataTick}`} primaryCurrency={t.primaryCurrency} openAccountId={accountId} onOpenAccount={openAccount} onCloseAccount={closeAccount}/>}
+          {tab === 'cashflow' && <CashflowTab key={`cashflow-${dataTick}`} section={section}/>}
+          {tab === 'passive' && <PassiveTab key={`passive-${dataTick}`} section={section}/>}
+          {tab === 'intake' && <IntakeTab onIngested={() => setDataTick(x => x + 1)}/>}
+        </main>
+      </div>
 
       <TweaksPanel>
         <TweakSection label="Theme"/>
