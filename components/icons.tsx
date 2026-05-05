@@ -2,7 +2,7 @@ import React from 'react';
 // Inline SVG icons — minimal stroke icons, no fills.
 // Usage: <Icon name="bank" size={16}/>
 
-const ICON_PATHS = {
+const ICON_PATHS: Record<string, React.ReactNode> = {
   bank:        <><path d="M3 9 12 4l9 5"/><path d="M5 10v8M19 10v8M9 10v8M15 10v8"/><path d="M3 19h18"/></>,
   vault:       <><rect x="3" y="5" width="18" height="14" rx="1"/><circle cx="14" cy="12" r="3"/><path d="M14 9v-1M14 16v-1M11 12h-1M17 12h1"/></>,
   chart:       <><path d="M3 17l5-5 4 4 7-7"/><path d="M14 9h5v5"/></>,
@@ -38,7 +38,15 @@ const ICON_PATHS = {
   external:    <><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"/></>,
 };
 
-function Icon({ name, size = 16, color = 'currentColor', strokeWidth = 1.6, style }) {
+interface IconProps {
+  name: string;
+  size?: number;
+  color?: string;
+  strokeWidth?: number;
+  style?: React.CSSProperties;
+}
+
+function Icon({ name, size = 16, color = 'currentColor', strokeWidth = 1.6, style }: IconProps) {
   const p = ICON_PATHS[name];
   if (!p) return null;
   return (
@@ -50,7 +58,7 @@ function Icon({ name, size = 16, color = 'currentColor', strokeWidth = 1.6, styl
 }
 
 // Map account type → icon
-const ACC_TYPE_ICON = {
+const ACC_TYPE_ICON: Record<string, string> = {
   checking: 'bank', savings: 'bank',
   money_market: 'vault',
   brokerage: 'chart',
@@ -60,7 +68,7 @@ const ACC_TYPE_ICON = {
 };
 
 // Map expense category → icon
-const CAT_ICON = {
+const CAT_ICON: Record<string, string> = {
   food: 'cart', transport: 'car', housing: 'home', utilities: 'plug',
   health: 'heart', entertainment: 'ticket', travel: 'plane', shopping: 'bag',
   gifts: 'gift', taxes: 'receipt', savings_transfer: 'swap', fees: 'coin',

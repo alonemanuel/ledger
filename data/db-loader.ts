@@ -1,4 +1,5 @@
-import { ACCOUNTS, SNAPSHOTS, INCOME, EXPENSES, FX } from './data.js';
+import { ACCOUNTS, SNAPSHOTS, INCOME, EXPENSES, FX } from './data.ts';
+import type { Account, Snapshot, IncomeRow, ExpenseRow } from '../types.ts';
 // Database loader — fetches the user's ledger from the API (backed by Neon
 // Postgres) and populates window.FinanceData in place.
 //
@@ -12,11 +13,32 @@ const SCOPES = 'email profile';
 const TOKEN_KEY = 'ledger_db_token_v1';
 const CONSENTED_KEY = 'ledger_db_consented_v1';
 
-let tokenClient = null;
-let accessToken = null;
+interface TokenClient {
+  callback: (response: OAuthResponse) => void;
+  error_callback: (err: { type?: string; message?: string }) => void;
+  requestAccessToken: (opts: { prompt: string }) => void;
+}
+
+interface OAuthResponse {
+  access_token?: string;
+  error?: string;
+  expires_in?: number;
+}
+
+interface BuiltData {
+  accounts: Account[];
+  snapshots: Snapshot[];
+  income: IncomeRow[];
+  expenses: ExpenseRow[];
+  fxFull: Record<string, number>;
+  fxCurrent: number;
+}
+
+let tokenClient: TokenClient | null = null;
+let accessToken: string | null = null;
 
 // ── GIS helpers ────────────────────────────────────────────────
-function waitFor(predicate, timeoutMs = 8000) {
+function waitFor(predicate: () => unknown, timeoutMs = 8000): Promise<void> {
   return new Promise((resolve, reject) => {
     const start = Date.now();
     (function check() {
@@ -27,7 +49,7 @@ function waitFor(predicate, timeoutMs = 8000) {
   });
 }
 
-async function ensureGisInited() {
+async function ensureGisInited(): Promise<void> {
   if (tokenClient) return;
   await waitFor(() => window.google?.accounts?.oauth2);
   tokenClient = google.accounts.oauth2.initTokenClient({
@@ -37,7 +59,7 @@ async function ensureGisInited() {
   });
 }
 
-function loadCachedToken() {
+function loadCachedToken(): boolean {
   try {
     const raw = localStorage.getItem(TOKEN_KEY);
     if (!raw) return false;
@@ -50,29 +72,29 @@ function loadCachedToken() {
   return false;
 }
 
-function clearCachedToken() {
+function clearCachedToken(): void {
   localStorage.removeItem(TOKEN_KEY);
   accessToken = null;
 }
 
-function hasConsented() {
+function hasConsented(): boolean {
   return localStorage.getItem(CONSENTED_KEY) === '1';
 }
 
-function saveToken(response) {
-  accessToken = response.access_token;
-  const expiresAt = Date.now() + (response.expires_in - 60) * 1000;
+function saveToken(response: OAuthResponse): void {
+  accessToken = response.access_token!;
+  const expiresAt = Date.now() + ((response.expires_in ?? 3600) - 60) * 1000;
   localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: accessToken, expiresAt }));
   localStorage.setItem(CONSENTED_KEY, '1');
 }
 
-function requestSignIn({ silent = false } = {}) {
+function requestSignIn({ silent = false } = {}): Promise<void> {
   return new Promise((resolve, reject) => {
     if (!tokenClient) {
       reject(new Error('Sign-in not ready — Google Identity library not loaded yet'));
       return;
     }
-    tokenClient.callback = (response) => {
+    tokenClient.callback = (response: OAuthResponse) => {
       if (response.error) {
         reject(new Error(silent ? 'SILENT_FAILED' : `OAuth error: ${response.error}`));
         return;
@@ -84,7 +106,7 @@ function requestSignIn({ silent = false } = {}) {
       saveToken(response);
       resolve();
     };
-    tokenClient.error_callback = (err) => {
+    tokenClient.error_callback = (err: { type?: string; message?: string }) => {
       const t = err?.type || '';
       if (silent) { reject(new Error('SILENT_FAILED')); return; }
       if (t === 'popup_failed_to_open') reject(new Error('POPUP_BLOCKED'));
@@ -96,12 +118,12 @@ function requestSignIn({ silent = false } = {}) {
 }
 
 // ── API calls ──────────────────────────────────────────────────
-async function apiFetch(path, opts = {}) {
+async function apiFetch(path: string, opts: RequestInit = {}): Promise<any> {
   if (!accessToken) throw new Error('Not signed in');
   const res = await fetch(path, {
     ...opts,
     headers: {
-      ...opts.headers,
+      ...(opts.headers as Record<string, string>),
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
@@ -122,11 +144,11 @@ async function apiFetch(path, opts = {}) {
 // the Sheets loader: snapshot dedup/forward-fill, FX interpolation,
 // income annual-spread, expense owner resolution.
 
-const ALL_MONTHS = (() => {
+const ALL_MONTHS: string[] = (() => {
   const now = new Date();
   const endYear = now.getFullYear();
   const endMonth = now.getMonth() + 1;
-  const out = [];
+  const out: string[] = [];
   for (let y = 2024; y <= endYear; y++) {
     for (let m = 1; m <= 12; m++) {
       if (y === 2024 && m < 5) continue;
@@ -137,8 +159,9 @@ const ALL_MONTHS = (() => {
   return out;
 })();
 
-function buildFromApiData({ accounts: acctRows, snapshots: snapRows, income: incRows, expenses: expRows, fx_rates: fxRatesMap }) {
-  const accounts = acctRows.map(a => ({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildFromApiData({ accounts: acctRows, snapshots: snapRows, income: incRows, expenses: expRows, fx_rates: fxRatesMap }: any): BuiltData {
+  const accounts: Account[] = acctRows.map((a: any) => ({
     id: a.id,
     owner: a.owner,
     provider: a.provider,
@@ -149,20 +172,20 @@ function buildFromApiData({ accounts: acctRows, snapshots: snapRows, income: inc
   }));
 
   // Snapshot dedup + forward-fill
-  const perAcct = {};
-  snapRows.forEach(s => {
+  const perAcct: Record<string, { date: string; ym: string; balance: number }[]> = {};
+  snapRows.forEach((s: any) => {
     const date = s.date || '';
     if (!perAcct[s.account_id]) perAcct[s.account_id] = [];
     perAcct[s.account_id].push({ date, ym: date.slice(0, 7), balance: parseFloat(s.balance_native) });
   });
-  const snapshots = [];
+  const snapshots: Snapshot[] = [];
   accounts.forEach(acc => {
     const list = (perAcct[acc.id] || []).slice().sort((a, b) => a.date.localeCompare(b.date));
     if (!list.length) return;
     const firstYm = list[0].ym;
-    const dict = {};
+    const dict: Record<string, number> = {};
     list.forEach(item => { dict[item.ym] = item.balance; });
-    let last = null;
+    let last: number | null = null;
     ALL_MONTHS.forEach(ym => {
       if (ym < firstYm) return;
       if (dict[ym] !== undefined) last = dict[ym];
@@ -171,19 +194,19 @@ function buildFromApiData({ accounts: acctRows, snapshots: snapRows, income: inc
   });
 
   // FX rates — use DB fx_rates table, with forward-fill
-  const fxByMonth = {};
+  const fxByMonth: Record<string, number> = {};
   for (const [ym, rate] of Object.entries(fxRatesMap || {})) {
-    fxByMonth[ym] = parseFloat(rate);
+    fxByMonth[ym] = parseFloat(rate as string);
   }
   // Also extract from USD snapshots as fallback
-  snapRows.forEach(s => {
+  snapRows.forEach((s: any) => {
     if ((s.currency === 'USD') && s.fx_rate) {
       const r = parseFloat(s.fx_rate);
       if (r > 0) fxByMonth[(s.date || '').slice(0, 7)] = r;
     }
   });
   let lastRate = 3.20;
-  const fxFull = {};
+  const fxFull: Record<string, number> = {};
   ALL_MONTHS.forEach(ym => {
     if (fxByMonth[ym]) lastRate = fxByMonth[ym];
     fxFull[ym] = lastRate;
@@ -191,21 +214,21 @@ function buildFromApiData({ accounts: acctRows, snapshots: snapRows, income: inc
   const fxCurrent = fxByMonth[ALL_MONTHS[ALL_MONTHS.length - 1]] || lastRate;
 
   // Income with annual-spread
-  const SOURCE_OWNER = { MongooseNet: 'Alon', ImagenAI: 'Alon', Bezalel: 'Alon', IBKR: 'Alon' };
-  const income = [];
-  incRows.forEach(r => {
-    const src = r.source;
-    const typ = r.type;
+  const SOURCE_OWNER: Record<string, string> = { MongooseNet: 'Alon', ImagenAI: 'Alon', Bezalel: 'Alon', IBKR: 'Alon' };
+  const income: IncomeRow[] = [];
+  incRows.forEach((r: any) => {
+    const src: string = r.source;
+    const typ: string = r.type;
     const owner = SOURCE_OWNER[src] || 'Alon';
     const amt = parseFloat(r.gross_native);
-    const cur = (r.currency || 'ILS').replace('NIS', 'ILS');
-    const dateStr = r.date || '';
+    const cur = ((r.currency || 'ILS') as string).replace('NIS', 'ILS') as 'ILS' | 'USD';
+    const dateStr: string = r.date || '';
     const ym = dateStr.slice(0, 7);
     const isAnnual = dateStr.endsWith('-12-31') &&
       ['salary', 'employer_pension_contribution', 'employer_study_fund_contribution'].includes(typ);
     if (isAnnual) {
       const year = ym.slice(0, 4);
-      let months;
+      let months: string[];
       if (src === 'MongooseNet') months = Array.from({ length: 11 }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`);
       else if (src === 'ImagenAI') months = [`${year}-11`, `${year}-12`];
       else if (src === 'Bezalel') months = [`${year}-06`];
@@ -221,10 +244,10 @@ function buildFromApiData({ accounts: acctRows, snapshots: snapRows, income: inc
 
   // Expenses
   const acctOwner = Object.fromEntries(accounts.map(a => [a.id, a.owner]));
-  const expenses = expRows.map((r, i) => {
+  const expenses: ExpenseRow[] = expRows.map((r: any, i: number) => {
     const amtNative = parseFloat(r.amount_native) || 0;
     const amtIls = parseFloat(r.amount_ils) || amtNative;
-    const cur = (r.currency || 'ILS').replace('NIS', 'ILS');
+    const cur = ((r.currency || 'ILS') as string).replace('NIS', 'ILS');
     return {
       id: r.id || i + 1,
       date: r.date,
@@ -247,7 +270,7 @@ function buildFromApiData({ accounts: acctRows, snapshots: snapRows, income: inc
   return { accounts, snapshots, income, expenses, fxFull, fxCurrent };
 }
 
-function populateFinanceData(built) {
+function populateFinanceData(built: BuiltData): void {
   ACCOUNTS.length = 0; ACCOUNTS.push(...built.accounts);
   SNAPSHOTS.length = 0; SNAPSHOTS.push(...built.snapshots);
   INCOME.length = 0; INCOME.push(...built.income);
@@ -276,7 +299,7 @@ async function bootstrap() {
   if (loadCachedToken()) {
     try {
       return await fetchAndPopulate();
-    } catch (e) {
+    } catch (e: any) {
       if (e.message !== 'AUTH_EXPIRED') throw e;
     }
   }
@@ -284,14 +307,14 @@ async function bootstrap() {
     try {
       await requestSignIn({ silent: true });
       return await fetchAndPopulate();
-    } catch (e) {
+    } catch (e: any) {
       if (e.message !== 'SILENT_FAILED' && e.message !== 'AUTH_EXPIRED') throw e;
     }
   }
   throw new Error('NEEDS_SIGNIN');
 }
 
-function signOut() {
+function signOut(): void {
   if (accessToken && window.google?.accounts?.oauth2) {
     google.accounts.oauth2.revoke(accessToken, () => {});
   }
@@ -299,7 +322,7 @@ function signOut() {
   localStorage.removeItem(CONSENTED_KEY);
 }
 
-async function loadDemoData() {
+async function loadDemoData(): Promise<void> {
   const src = window.__LEDGER_DEMO_SOURCE__
     || await fetch('data/data.example.js').then(r => {
       if (!r.ok) throw new Error(`Demo data not available (${r.status})`);
@@ -317,7 +340,7 @@ async function loadDemoData() {
   });
 }
 
-async function appendRows(tab, rows) {
+async function appendRows(tab: string, rows: unknown[]): Promise<{ appended: number }> {
   if (!rows?.length) return { appended: 0 };
   const result = await apiFetch(`/api/${tab}`, {
     method: 'POST',
@@ -326,7 +349,7 @@ async function appendRows(tab, rows) {
   return { appended: result.inserted || 0 };
 }
 
-function getCurrentToken() { return accessToken; }
+function getCurrentToken(): string | null { return accessToken; }
 
 window.DbLoader = {
   init: ensureGisInited,
@@ -338,4 +361,3 @@ window.DbLoader = {
   appendRows,
   getCurrentToken,
 };
-

@@ -1,15 +1,16 @@
 import React, { useState as useStateAcc, useMemo as useMemoAcc } from 'react';
-import { Fin } from '../data/helpers.js';
-import { ACCOUNTS as ACCS_ACC, TYPE_GROUP as TG_ACC, TYPE_ICON as TI_ACC } from '../data/data.js';
-import { Icon, ACC_TYPE_ICON } from './icons.jsx';
-import { LineChart, Sparkline, TimeRangeFilter } from './charts.jsx';
+import { Fin } from '../data/helpers.ts';
+import { ACCOUNTS as ACCS_ACC, TYPE_GROUP as TG_ACC, TYPE_ICON as TI_ACC } from '../data/data.ts';
+import { Icon, ACC_TYPE_ICON } from './icons.tsx';
+import { LineChart, Sparkline, TimeRangeFilter } from './charts.tsx';
+import type { Account } from '../types.ts';
 // Tab: Accounts & Net Worth
 
-function StatusDot({ status }) {
+function StatusDot({ status }: { status: string }) {
   return <span className={`status-dot status-${status}`} title={status}></span>;
 }
 
-function AccountRow({ acc, onOpen, primaryCurrency }) {
+function AccountRow({ acc, onOpen, primaryCurrency }: { acc: Account; onOpen: () => void; primaryCurrency: string }) {
   const native = window.FinanceData.SNAPSHOTS.find(s => s.accountId === acc.id && s.ym === Fin.LATEST)?.balance || 0;
   const ils = Fin.balanceILS(acc.id, Fin.LATEST);
   const series = Fin.accountSeries(acc.id).slice(-12).map(p => p.value);
@@ -41,7 +42,7 @@ function AccountRow({ acc, onOpen, primaryCurrency }) {
   );
 }
 
-function AccountDetail({ acc, onClose }) {
+function AccountDetail({ acc, onClose }: { acc: Account; onClose: () => void }) {
   const [range, setRange] = useStateAcc('1Y');
   const series = Fin.accountSeries(acc.id);
   const sliced = Fin.sliceByRange(series, range);
@@ -62,7 +63,7 @@ function AccountDetail({ acc, onClose }) {
           <h3>Balance history</h3>
           <TimeRangeFilter value={range} onChange={setRange}/>
         </header>
-        <LineChart data={sliced} height={280} formatY={(v) => Fin.fmtILS(v, { compact: true })}/>
+        <LineChart data={sliced} height={280} formatY={(v: number) => Fin.fmtILS(v, { compact: true })}/>
       </section>
       <section className="panel">
         <header className="panel-h"><h3>Snapshots</h3><span className="panel-sub">monthly</span></header>
@@ -80,7 +81,7 @@ function AccountDetail({ acc, onClose }) {
                   <td className="r mono private">{acc.currency === 'USD' ? Fin.fmtUSD(s.native) : Fin.fmtILS(s.native)}</td>
                   <td className="r mono private">{Fin.fmtILS(s.value)}</td>
                   <td className="r mono">{acc.currency === 'USD' ? window.FinanceData.FX.rateFor(s.ym).toFixed(4) : '—'}</td>
-                  <td className={`r mono private ${delta >= 0 ? 'pos' : 'neg'}`}>{next ? Fin.fmtSigned(delta, (v) => Fin.fmtILS(v, { compact: true })) : '—'}</td>
+                  <td className={`r mono private ${delta >= 0 ? 'pos' : 'neg'}`}>{next ? Fin.fmtSigned(delta, (v: number) => Fin.fmtILS(v, { compact: true })) : '—'}</td>
                 </tr>
               );
             })}
@@ -91,7 +92,14 @@ function AccountDetail({ acc, onClose }) {
   );
 }
 
-function AccountsTab({ primaryCurrency, openAccountId, onOpenAccount, onCloseAccount }) {
+interface AccountsTabProps {
+  primaryCurrency: string;
+  openAccountId: string | null;
+  onOpenAccount: (id: string) => void;
+  onCloseAccount: () => void;
+}
+
+function AccountsTab({ primaryCurrency, openAccountId, onOpenAccount, onCloseAccount }: AccountsTabProps) {
   const [filterOwner, setFilterOwner] = useStateAcc('all');
   const [filterStatus, setFilterStatus] = useStateAcc('active');
   const [showDetails, setShowDetails] = useStateAcc(false);
@@ -107,7 +115,7 @@ function AccountsTab({ primaryCurrency, openAccountId, onOpenAccount, onCloseAcc
   );
 
   // group rollups
-  const groups = {};
+  const groups: Record<string, Account[]> = {};
   filtered.forEach(a => {
     const g = showDetails
       ? (a.type === 'pension_comprehensive' ? 'Pension — Comprehensive'
@@ -142,15 +150,15 @@ function AccountsTab({ primaryCurrency, openAccountId, onOpenAccount, onCloseAcc
       </div>
 
       {Object.entries(groups).map(([g, accs]) => {
-        const gTotal = accs.reduce((s, a) => s + Fin.balanceILS(a.id, Fin.LATEST), 0);
+        const gTotal = (accs as Account[]).reduce((s: number, a: Account) => s + Fin.balanceILS(a.id, Fin.LATEST), 0);
         return (
           <section key={g} className="panel acc-group">
             <header className="panel-h">
-              <h3><span className="group-swatch" style={{ background: Fin.GROUP_COLOR[TG_ACC[accs[0].type]] || 'var(--rule)' }}></span>{g}</h3>
-              <span className="panel-sub">{accs.length} account{accs.length>1?'s':''} · <span className="private">{Fin.fmtILS(gTotal)}</span> · <span className="private">{((gTotal/totalNW)*100).toFixed(0)}%</span></span>
+              <h3><span className="group-swatch" style={{ background: Fin.GROUP_COLOR[TG_ACC[(accs as Account[])[0].type]] || 'var(--rule)' }}></span>{g}</h3>
+              <span className="panel-sub">{(accs as Account[]).length} account{(accs as Account[]).length>1?'s':''} · <span className="private">{Fin.fmtILS(gTotal)}</span> · <span className="private">{((gTotal/totalNW)*100).toFixed(0)}%</span></span>
             </header>
             <div className="acc-list">
-              {accs.map(a => <AccountRow key={a.id} acc={a} primaryCurrency={primaryCurrency} onOpen={() => onOpenAccount(a.id)}/>)}
+              {(accs as Account[]).map((a: Account) => <AccountRow key={a.id} acc={a} primaryCurrency={primaryCurrency} onOpen={() => onOpenAccount(a.id)}/>)}
             </div>
           </section>
         );

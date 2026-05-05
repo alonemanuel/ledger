@@ -1,33 +1,29 @@
 import React, { useState as useStateCf } from 'react';
-import { Fin } from '../data/helpers.js';
-import { CATEGORIES } from '../data/data.js';
-import { Icon, CAT_ICON } from './icons.jsx';
-import { PairedBars, StackedBar, Treemap } from './charts.jsx';
+import { Fin } from '../data/helpers.ts';
+import { CATEGORIES } from '../data/data.ts';
+import { Icon, CAT_ICON } from './icons.tsx';
+import { PairedBars, StackedBar, Treemap } from './charts.tsx';
 // Tab: Cashflow
 
 const CF_SAVINGS_LS = 'ledger_cashflow_show_savings';
 
 function CashflowTab() {
   const [windowMonths, setWindowMonths] = useStateCf(12);
-  const [openCat, setOpenCat] = useStateCf(null);
+  const [openCat, setOpenCat] = useStateCf<string | null>(null);
   const [ownerFilter, setOwnerFilter] = useStateCf('all');
   const [showSavings, setShowSavingsState] = useStateCf(() => {
     try { return localStorage.getItem(CF_SAVINGS_LS) !== 'false'; }
     catch (_) { return true; }
   });
-  const [expSort, setExpSort] = useStateCf({ col: 'amount', dir: 'desc' });
-  const setShowSavings = (v) => {
+  const [expSort, setExpSort] = useStateCf<{ col: string; dir: string }>({ col: 'amount', dir: 'desc' });
+  const setShowSavings = (v: boolean) => {
     setShowSavingsState(v);
     try { localStorage.setItem(CF_SAVINGS_LS, String(v)); } catch (_) {}
   };
 
   const months = Fin.ALL_MONTHS.slice(-windowMonths);
-  const matchOwner = (rec) => ownerFilter === 'all' || rec.owner === ownerFilter;
+  const matchOwner = (rec: { owner: string }) => ownerFilter === 'all' || rec.owner === ownerFilter;
 
-  // Income vs expense per month. Investment categories (e.g. savings_transfer)
-  // are split out so the IvE chart can either hide them (showSavings off) or
-  // stack them as a blue segment on top of the expense bar (showSavings on).
-  // The net line in PairedBars considers the total outflow shown in the bar.
   const ie = months.map(ym => {
     const inc = window.FinanceData.INCOME
       .filter(i => i.ym === ym && matchOwner(i))
@@ -44,10 +40,9 @@ function CashflowTab() {
       : { ym, income: inc, expense: regular };
   });
 
-  // Stacked expenses by category (with hover details)
   const expCats = window.FinanceData.CATEGORIES;
   const expStacked = months.map(ym => {
-    const row = { ym };
+    const row: Record<string, any> = { ym };
     window.FinanceData.EXPENSES
       .filter(e => e.ym === ym && matchOwner(e))
       .forEach(e => {
@@ -59,9 +54,8 @@ function CashflowTab() {
   });
   const allExpKeys = [...expCats, 'uncategorized'];
 
-  // last 3 months — categories treemap (squarified, area ∝ amount)
   const last3 = Fin.ALL_MONTHS.slice(-3);
-  const cat3 = {};
+  const cat3: Record<string, number> = {};
   window.FinanceData.EXPENSES
     .filter(e => last3.includes(e.ym) && matchOwner(e))
     .forEach(e => {
@@ -69,14 +63,13 @@ function CashflowTab() {
       cat3[k] = (cat3[k] || 0) + Fin.toILS(e.amount, e.currency, e.ym);
     });
   const treemapItems = Object.entries(cat3)
-    .sort((a, b) => b[1] - a[1])
+    .sort((a, b) => (b[1] as number) - (a[1] as number))
     .map(([k, v]) => ({
-      label: Fin.PRETTY_CAT[k] || k, value: v,
+      label: Fin.PRETTY_CAT[k] || k, value: v as number,
       color: Fin.CATEGORY_COLOR[k] || 'var(--rule)',
       icon: CAT_ICON[k],
     }));
 
-  // Top single spendings (largest individual transactions)
   const topSpend = window.FinanceData.EXPENSES
     .filter(e => months.includes(e.ym) && matchOwner(e))
     .sort((a, b) => Fin.toILS(b.amount, b.currency, b.ym) - Fin.toILS(a.amount, a.currency, a.ym))
@@ -92,15 +85,13 @@ function CashflowTab() {
       return sign * (Fin.toILS(a.amount, a.currency, a.ym) - Fin.toILS(b.amount, b.currency, b.ym));
     });
 
-  const sortArrow = (col) => expSort.col === col ? (expSort.dir === 'asc' ? ' ↑' : ' ↓') : null;
-  const toggleSort = (col) => setExpSort(s =>
+  const sortArrow = (col: string) => expSort.col === col ? (expSort.dir === 'asc' ? ' ↑' : ' ↓') : null;
+  const toggleSort = (col: string) => setExpSort(s =>
     s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'desc' }
   );
 
-  // mystery
   const mystery = window.FinanceData.EXPENSES.filter(e => !e.category && months.includes(e.ym) && matchOwner(e));
 
-  // category drill-down
   const catTx = openCat
     ? window.FinanceData.EXPENSES
         .filter(e => (e.category === openCat) && months.includes(e.ym) && matchOwner(e))
@@ -137,14 +128,14 @@ function CashflowTab() {
           {showSavings && (
             <span><span className="sw" style={{ background: Fin.INVESTMENT_COLOR }}></span>Savings</span>
           )}
-          <span><span className="sw" style={{ background: 'var(--ink)', height: 2, width: 14, marginRight: 6 }}></span>Net</span>
+          <span><span className="sw" style={{ background: 'var(--ink)', height: 2, width: 14, marginRight: 6 } as React.CSSProperties}></span>Net</span>
         </div>
       </section>
 
       <section className="panel">
         <header className="panel-h"><h3>Expenses by category</h3><span className="panel-sub">stacked monthly · hover a band to isolate</span></header>
         <StackedBar data={expStacked} keys={allExpKeys} colors={Fin.CATEGORY_COLOR} height={260}
-          labelFor={(k) => Fin.PRETTY_CAT[k] || k}/>
+          labelFor={(k: string) => Fin.PRETTY_CAT[k] || k}/>
         <ul className="legend cat-legend">
           {allExpKeys.map(c => (
             <li key={c} className="clickable" onClick={() => setOpenCat(c)}>
@@ -171,9 +162,9 @@ function CashflowTab() {
                 <td className="mono">{e.date}</td>
                 <td>{e.merchant}</td>
                 <td>
-                  <span className="cat-pill" style={{ '--c': Fin.CATEGORY_COLOR[e.category || 'uncategorized'] }}>
+                  <span className="cat-pill" style={{ '--c': Fin.CATEGORY_COLOR[e.category || 'uncategorized'] } as React.CSSProperties}>
                     <Icon name={CAT_ICON[e.category || 'uncategorized']} size={11}/>
-                    {Fin.PRETTY_CAT[e.category] || e.category || '—'}
+                    {Fin.PRETTY_CAT[e.category ?? ''] || e.category || '—'}
                   </span>
                 </td>
                 <td>{e.owner}</td>
@@ -206,9 +197,9 @@ function CashflowTab() {
                 <td className="mono">{e.date}</td>
                 <td>{e.merchant}</td>
                 <td>
-                  <span className="cat-pill" style={{ '--c': Fin.CATEGORY_COLOR[e.category || 'uncategorized'] }}>
+                  <span className="cat-pill" style={{ '--c': Fin.CATEGORY_COLOR[e.category || 'uncategorized'] } as React.CSSProperties}>
                     <Icon name={CAT_ICON[e.category || 'uncategorized']} size={11}/>
-                    {Fin.PRETTY_CAT[e.category] || e.category || '—'}
+                    {Fin.PRETTY_CAT[e.category ?? ''] || e.category || '—'}
                   </span>
                 </td>
                 <td>{e.owner}</td>

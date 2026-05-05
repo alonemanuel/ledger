@@ -1,32 +1,40 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import ReactDOM from 'react-dom/client';
 import './styles.css';
-import './data/data.js';
-import { Fin } from './data/helpers.js';
-import './data/db-loader.js';
+import './data/data.ts';
+import { Fin } from './data/helpers.ts';
+import './data/db-loader.ts';
 import demoSource from './data/data.example.js?raw';
 window.__LEDGER_DEMO_SOURCE__ = demoSource;
-import { useTweaks, TweaksPanel, TweakSection, TweakToggle, TweakRadio, TweakSelect } from './tweaks-panel.jsx';
-import { Icon } from './components/icons.jsx';
-import { OverviewTab } from './components/tab-overview.jsx';
-import { AccountsTab } from './components/tab-accounts.jsx';
-import { CashflowTab } from './components/tab-cashflow.jsx';
-import { PassiveTab } from './components/tab-passive.jsx';
-import { IntakeTab } from './components/tab-intake.jsx';
+import { useTweaks, TweaksPanel, TweakSection, TweakToggle, TweakRadio, TweakSelect } from './tweaks-panel.tsx';
+import { Icon } from './components/icons.tsx';
+import { OverviewTab } from './components/tab-overview.tsx';
+import { AccountsTab } from './components/tab-accounts.tsx';
+import { CashflowTab } from './components/tab-cashflow.tsx';
+import { PassiveTab } from './components/tab-passive.tsx';
+import { IntakeTab } from './components/tab-intake.tsx';
 // Main app — shell, header, FX strip, tabs.
 
 /* ── ErrorBoundary ────────────────────────────────────────────────────── */
-class ErrorBoundary extends React.Component {
-  constructor(props) {
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error, info) {
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('[ErrorBoundary]', error, info.componentStack);
   }
 
@@ -66,14 +74,22 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "privacy": false
 }/*EDITMODE-END*/;
 
-const ACCENT_PALETTES = {
+const ACCENT_PALETTES: Record<string, { accent: string; accent2: string }> = {
   ochre:     { accent: 'oklch(62% 0.13 65)', accent2: 'oklch(72% 0.10 80)' },
   terracotta:{ accent: 'oklch(58% 0.13 35)', accent2: 'oklch(68% 0.10 50)' },
   ink:       { accent: 'oklch(45% 0.10 250)', accent2: 'oklch(60% 0.08 230)' },
   moss:      { accent: 'oklch(54% 0.10 140)', accent2: 'oklch(66% 0.08 130)' },
 };
 
-function FxStrip({ rate, manualOpen, setManualOpen, manualRate, setManualRate }) {
+interface FxStripProps {
+  rate: number;
+  manualOpen: boolean;
+  setManualOpen: (v: boolean) => void;
+  manualRate: number;
+  setManualRate: (v: number) => void;
+}
+
+function FxStrip({ rate, manualOpen, setManualOpen, manualRate, setManualRate }: FxStripProps) {
   return (
     <div className={`fx-strip ${manualOpen ? 'open' : ''}`}>
       <button className="fx-summary" onClick={() => setManualOpen(!manualOpen)}>
@@ -105,16 +121,17 @@ function FxStrip({ rate, manualOpen, setManualOpen, manualRate, setManualRate })
   );
 }
 
-const TAB_IDS = ['overview', 'accounts', 'cashflow', 'passive', 'intake'];
+const TAB_IDS = ['overview', 'accounts', 'cashflow', 'passive', 'intake'] as const;
+type TabId = typeof TAB_IDS[number];
 
-function parseUrl() {
+function parseUrl(): { tab: string; accountId: string | null } {
   const segs = location.pathname.split('/').filter(Boolean);
-  const tab = TAB_IDS.includes(segs[0]) ? segs[0] : 'overview';
+  const tab = (TAB_IDS as readonly string[]).includes(segs[0]) ? segs[0] : 'overview';
   const accountId = (tab === 'accounts' && segs[1]) ? decodeURIComponent(segs[1]) : null;
   return { tab, accountId };
 }
 
-function pathFor(tab, accountId) {
+function pathFor(tab: string, accountId: string | null): string {
   if (tab === 'accounts' && accountId) return `/accounts/${encodeURIComponent(accountId)}`;
   if (tab === 'overview') return '/';
   return `/${tab}`;
@@ -129,8 +146,8 @@ function App() {
   // re-mount and re-derive from the freshly populated FinanceData.
   const [dataTick, setDataTick] = useState(0);
 
-  const goTab = (id) => setRoute({ tab: id, accountId: null });
-  const openAccount = (id) => setRoute({ tab: 'accounts', accountId: id });
+  const goTab = (id: string) => setRoute({ tab: id, accountId: null });
+  const openAccount = (id: string) => setRoute({ tab: 'accounts', accountId: id });
   const closeAccount = () => setRoute({ tab: 'accounts', accountId: null });
 
   // apply manual rate
@@ -213,21 +230,21 @@ function App() {
 
       <TweaksPanel>
         <TweakSection label="Theme"/>
-        <TweakToggle label="Dark mode" value={t.dark} onChange={v => setTweak('dark', v)}/>
-        <TweakRadio label="Density" value={t.density} options={['compact','regular']} onChange={v => setTweak('density', v)}/>
-        <TweakSelect label="Accent" value={t.accent} options={['ochre','terracotta','ink','moss']} onChange={v => setTweak('accent', v)}/>
+        <TweakToggle label="Dark mode" value={t.dark} onChange={(v: boolean) => setTweak('dark', v)}/>
+        <TweakRadio label="Density" value={t.density} options={['compact','regular']} onChange={(v: string) => setTweak('density', v)}/>
+        <TweakSelect label="Accent" value={t.accent} options={['ochre','terracotta','ink','moss']} onChange={(v: string) => setTweak('accent', v)}/>
         <TweakSection label="Display"/>
-        <TweakRadio label="Currency primary" value={t.primaryCurrency} options={['ILS','USD','native']} onChange={v => setTweak('primaryCurrency', v)}/>
-        <TweakToggle label="Pension detail groups" value={t.groupDetails} onChange={v => setTweak('groupDetails', v)}/>
-        <TweakToggle label="Privacy mode (hide ₪)" value={t.privacy} onChange={v => setTweak('privacy', v)}/>
+        <TweakRadio label="Currency primary" value={t.primaryCurrency} options={['ILS','USD','native']} onChange={(v: string) => setTweak('primaryCurrency', v)}/>
+        <TweakToggle label="Pension detail groups" value={t.groupDetails} onChange={(v: boolean) => setTweak('groupDetails', v)}/>
+        <TweakToggle label="Privacy mode (hide ₪)" value={t.privacy} onChange={(v: boolean) => setTweak('privacy', v)}/>
       </TweaksPanel>
     </div>
   );
 }
 
 function Bootstrap() {
-  const [phase, setPhase] = useState('loading');   // loading | signin | fetching | ready | error
-  const [error, setError] = useState(null);
+  const [phase, setPhase] = useState<string>('loading');   // loading | signin | fetching | ready | error
+  const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
   const start = async () => {
@@ -236,7 +253,7 @@ function Bootstrap() {
       await window.DbLoader.init();
       await window.DbLoader.bootstrap();
       setTick(x => x + 1); setPhase('ready');
-    } catch (e) {
+    } catch (e: any) {
       if (e.message === 'NEEDS_SIGNIN') {
         setPhase('signin');
       } else {
@@ -251,7 +268,7 @@ function Bootstrap() {
       await window.DbLoader.requestSignIn();
       await window.DbLoader.fetchAndPopulate();
       setTick(x => x + 1); setPhase('ready');
-    } catch (e) {
+    } catch (e: any) {
       if (e.message === 'POPUP_BLOCKED') {
         setError('Pop-up blocked. Allow pop-ups for this site and try again, or use demo data.');
         setPhase('signin');
@@ -298,7 +315,7 @@ function Bootstrap() {
               try {
                 await window.DbLoader.loadDemoData();
                 setTick(x => x + 1); setPhase('ready');
-              } catch (e) {
+              } catch (e: any) {
                 setError(e.message || String(e)); setPhase('error');
               }
             }}>Load demo data</button>
@@ -319,10 +336,11 @@ function Bootstrap() {
 
 const isExample = import.meta.env.VITE_EXAMPLE_MODE === 'true';
 
-import { ACCOUNTS, SNAPSHOTS, INCOME, EXPENSES, FX } from './data/data.js';
+import { ACCOUNTS, SNAPSHOTS, INCOME, EXPENSES, FX } from './data/data.ts';
 
 async function mount() {
   if (isExample) {
+    // @ts-ignore side-effect script, not an ES module
     await import('./data/data.example.js');
     const ex = window.FinanceData;
     ACCOUNTS.length = 0; ACCOUNTS.push(...ex.ACCOUNTS);
@@ -335,7 +353,7 @@ async function mount() {
     FX.setOn = ex.FX.setOn;
     Fin.rebuildDerivations();
   }
-  ReactDOM.createRoot(document.getElementById('root')).render(
+  ReactDOM.createRoot(document.getElementById('root')!).render(
     isExample ? <App/> : <Bootstrap/>
   );
 }

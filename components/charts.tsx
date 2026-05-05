@@ -1,10 +1,15 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Fin } from '../data/helpers.js';
-import { Icon } from './icons.jsx';
+import { Fin } from '../data/helpers.ts';
+import { Icon } from './icons.tsx';
 // Hand-rolled SVG chart primitives for the dashboard.
 
 // ── TIME RANGE FILTER ──────────────────────────────────────────────────────
-function TimeRangeFilter({ value, onChange, options = Fin.RANGE_OPTIONS }) {
+interface TimeRangeFilterProps {
+  value: string;
+  onChange: (v: string) => void;
+  options?: string[];
+}
+function TimeRangeFilter({ value, onChange, options = Fin.RANGE_OPTIONS }: TimeRangeFilterProps) {
   return (
     <div className="seg time-range">
       {options.map(opt => (
@@ -19,8 +24,33 @@ function TimeRangeFilter({ value, onChange, options = Fin.RANGE_OPTIONS }) {
 }
 
 // ── LINE / AREA CHART ──────────────────────────────────────────────────────
-function LineChart({ data, height = 220, color = 'var(--accent)', fill = true, padding = { l: 56, r: 16, t: 16, b: 28 }, yTicks = 4, onHover, formatY, tooltipExtra }) {
-  const wrapRef = useRef(null);
+interface DataPoint {
+  ym: string;
+  value: number;
+  [key: string]: any;
+}
+
+interface ChartPadding {
+  l: number;
+  r: number;
+  t: number;
+  b: number;
+}
+
+interface LineChartProps {
+  data: DataPoint[];
+  height?: number;
+  color?: string;
+  fill?: boolean;
+  padding?: ChartPadding;
+  yTicks?: number;
+  onHover?: (idx: number | null, d: DataPoint | null) => void;
+  formatY?: (v: number) => string;
+  tooltipExtra?: (d: DataPoint) => React.ReactNode;
+}
+
+function LineChart({ data, height = 220, color = 'var(--accent)', fill = true, padding = { l: 56, r: 16, t: 16, b: 28 }, yTicks = 4, onHover, formatY, tooltipExtra }: LineChartProps) {
+  const wrapRef = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(800);
   useEffect(() => {
     if (!wrapRef.current) return;
@@ -33,24 +63,24 @@ function LineChart({ data, height = 220, color = 'var(--accent)', fill = true, p
 
   const innerW = w - padding.l - padding.r;
   const innerH = height - padding.t - padding.b;
-  const xs = data.map((_, i) => padding.l + (i / Math.max(1, data.length - 1)) * innerW);
-  const vals = data.map(d => d.value);
+  const xs = data.map((_: DataPoint, i: number) => padding.l + (i / Math.max(1, data.length - 1)) * innerW);
+  const vals = data.map((d: DataPoint) => d.value);
   const minV = Math.min(...vals, 0);
   const maxV = Math.max(...vals, 1);
   const range = maxV - minV || 1;
-  const y = (v) => padding.t + (1 - (v - minV) / range) * innerH;
+  const y = (v: number) => padding.t + (1 - (v - minV) / range) * innerH;
 
-  const path = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${xs[i].toFixed(1)},${y(d.value).toFixed(1)}`).join(' ');
+  const path = data.map((d: DataPoint, i: number) => `${i === 0 ? 'M' : 'L'}${xs[i].toFixed(1)},${y(d.value).toFixed(1)}`).join(' ');
   const areaPath = `${path} L${xs[xs.length-1].toFixed(1)},${(padding.t + innerH).toFixed(1)} L${xs[0].toFixed(1)},${(padding.t + innerH).toFixed(1)} Z`;
 
-  const ticks = [];
+  const ticks: { v: number; y: number }[] = [];
   for (let i = 0; i <= yTicks; i++) {
     const v = minV + (range * i) / yTicks;
     ticks.push({ v, y: y(v) });
   }
 
-  const [hover, setHover] = useState(null);
-  const handleMove = (e) => {
+  const [hover, setHover] = useState<number | null>(null);
+  const handleMove = (e: React.MouseEvent<SVGSVGElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const i = Math.round(((x - padding.l) / innerW) * (data.length - 1));
@@ -74,7 +104,7 @@ function LineChart({ data, height = 220, color = 'var(--accent)', fill = true, p
             <text x={padding.l - 8} y={t.y + 3} textAnchor="end" className="chart-axis private">{formatY ? formatY(t.v) : Math.round(t.v).toLocaleString()}</text>
           </g>
         ))}
-        {data.map((d, i) => (i % Math.ceil(data.length / 8) === 0 || i === data.length - 1) && (
+        {data.map((d: DataPoint, i: number) => (i % Math.ceil(data.length / 8) === 0 || i === data.length - 1) && (
           <text key={i} x={xs[i]} y={height - 8} textAnchor="middle" className="chart-axis">{Fin.fmtMonth(d.ym, { short: true })}</text>
         ))}
         {fill && <path d={areaPath} fill="url(#lc-fill)"/>}
@@ -98,8 +128,20 @@ function LineChart({ data, height = 220, color = 'var(--accent)', fill = true, p
 }
 
 // ── STACKED / GROUPED BAR ──────────────────────────────────────────────────
-function StackedBar({ data, keys, colors, height = 240, padding = { l: 56, r: 16, t: 16, b: 28 }, formatY = Fin.fmtILS, formatLabel, labelKey = 'ym', labelFor }) {
-  const wrapRef = useRef(null);
+interface StackedBarProps {
+  data: Record<string, any>[];
+  keys: string[];
+  colors: Record<string, string>;
+  height?: number;
+  padding?: ChartPadding;
+  formatY?: (v: number, opts?: { compact?: boolean }) => string;
+  formatLabel?: (v: string) => string;
+  labelKey?: string;
+  labelFor?: (k: string) => string;
+}
+
+function StackedBar({ data, keys, colors, height = 240, padding = { l: 56, r: 16, t: 16, b: 28 }, formatY = Fin.fmtILS, formatLabel, labelKey = 'ym', labelFor }: StackedBarProps) {
+  const wrapRef = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(800);
   useEffect(() => {
     if (!wrapRef.current) return;
@@ -109,14 +151,14 @@ function StackedBar({ data, keys, colors, height = 240, padding = { l: 56, r: 16
   }, []);
   const innerW = w - padding.l - padding.r;
   const innerH = height - padding.t - padding.b;
-  const totals = data.map(d => keys.reduce((s, k) => s + (d[k] || 0), 0));
+  const totals = data.map((d: Record<string, any>) => keys.reduce((s: number, k: string) => s + (d[k] || 0), 0));
   const maxV = Math.max(...totals, 1);
   const barW = (innerW / data.length) * 0.7;
   const gap = (innerW / data.length) * 0.3;
-  const [hover, setHover] = useState(null); // { i, k }
-  const fmtKey = labelFor || ((k) => k.replace(/_/g, ' '));
+  const [hover, setHover] = useState<{ i: number; k: string } | null>(null);
+  const fmtKey = labelFor || ((k: string) => k.replace(/_/g, ' '));
 
-  const ticks = [];
+  const ticks: { v: number; y: number }[] = [];
   for (let i = 0; i <= 4; i++) {
     const v = (maxV * i) / 4;
     ticks.push({ v, y: padding.t + (1 - i/4) * innerH });
@@ -131,12 +173,12 @@ function StackedBar({ data, keys, colors, height = 240, padding = { l: 56, r: 16
             <text x={padding.l - 8} y={t.y + 3} textAnchor="end" className="chart-axis private">{formatY(t.v, { compact: true })}</text>
           </g>
         ))}
-        {data.map((d, i) => {
+        {data.map((d: Record<string, any>, i: number) => {
           const x = padding.l + i * (barW + gap) + gap/2;
           let yCursor = padding.t + innerH;
           return (
             <g key={i}>
-              {keys.map(k => {
+              {keys.map((k: string) => {
                 const v = d[k] || 0;
                 const h = (v / maxV) * innerH;
                 yCursor -= h;
@@ -180,12 +222,21 @@ function StackedBar({ data, keys, colors, height = 240, padding = { l: 56, r: 16
 }
 
 // ── PAIRED INCOME-VS-EXPENSE BAR + NET LINE ────────────────────────────────
-// data: [{ ym, income, expense, investment? }]. When `investment` is present
-// (and > 0), the expense bar is rendered as two stacked segments: red for
-// regular expense, blue for investment. The net line considers the total
-// outflow (expense + investment).
-function PairedBars({ data, height = 260, padding = { l: 56, r: 16, t: 16, b: 28 } }) {
-  const wrapRef = useRef(null);
+interface PairedBarDataPoint {
+  ym: string;
+  income: number;
+  expense: number;
+  investment?: number;
+}
+
+interface PairedBarsProps {
+  data: PairedBarDataPoint[];
+  height?: number;
+  padding?: ChartPadding;
+}
+
+function PairedBars({ data, height = 260, padding = { l: 56, r: 16, t: 16, b: 28 } }: PairedBarsProps) {
+  const wrapRef = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(800);
   useEffect(() => {
     if (!wrapRef.current) return;
@@ -195,21 +246,20 @@ function PairedBars({ data, height = 260, padding = { l: 56, r: 16, t: 16, b: 28
   }, []);
   const innerW = w - padding.l - padding.r;
   const innerH = height - padding.t - padding.b;
-  const totalOut = (d) => d.expense + (d.investment || 0);
+  const totalOut = (d: PairedBarDataPoint) => d.expense + (d.investment || 0);
   const maxV = Math.max(...data.map(d => Math.max(d.income, totalOut(d))), 1);
   const slotW = innerW / data.length;
   const barW = slotW * 0.32;
-  const [hover, setHover] = useState(null);
+  const [hover, setHover] = useState<number | null>(null);
 
   const INCOME_COLOR = 'oklch(58% 0.08 140)';
   const EXPENSE_COLOR = 'oklch(58% 0.09 30)';
   const INV_COLOR = (Fin && Fin.INVESTMENT_COLOR) || 'oklch(60% 0.11 240)';
 
-  const ticks = [];
+  const ticks: { v: number; y: number }[] = [];
   for (let i = 0; i <= 4; i++) ticks.push({ v: (maxV*i)/4, y: padding.t + (1 - i/4) * innerH });
-  // net line, scaled to same axis but offset differently
   const netMax = Math.max(...data.map(d => Math.abs(d.income - totalOut(d))), 1);
-  const netY = (v) => padding.t + innerH/2 - (v / netMax) * (innerH/2 - 4);
+  const netY = (v: number) => padding.t + innerH/2 - (v / netMax) * (innerH/2 - 4);
   const anyInvestment = data.some(d => (d.investment || 0) > 0);
 
   return (
@@ -240,7 +290,6 @@ function PairedBars({ data, height = 260, padding = { l: 56, r: 16, t: 16, b: 28
             </g>
           );
         })}
-        {/* net cashflow line */}
         <path
           d={data.map((d, i) => {
             const cx = padding.l + i * slotW + slotW/2;
@@ -270,13 +319,30 @@ function PairedBars({ data, height = 260, padding = { l: 56, r: 16, t: 16, b: 28
 }
 
 // ── DOUGHNUT ───────────────────────────────────────────────────────────────
-function Donut({ entries, size = 200, thickness = 26, total, centerLabel, centerValue, hover, onHover }) {
+interface DonutEntry {
+  value: number;
+  color: string;
+  label: string;
+}
+
+interface DonutProps {
+  entries: DonutEntry[];
+  size?: number;
+  thickness?: number;
+  total?: number;
+  centerLabel?: string;
+  centerValue?: string;
+  hover?: number | null;
+  onHover?: (i: number | null) => void;
+}
+
+function Donut({ entries, size = 200, thickness = 26, total, centerLabel, centerValue, hover, onHover }: DonutProps) {
   const t = total ?? entries.reduce((s, e) => s + e.value, 0);
   const r = size/2 - 2;
   const ri = r - thickness;
   const cx = size/2, cy = size/2;
   let acc = 0;
-  const segs = entries.map((e, i) => {
+  const segs = entries.map((e) => {
     const a0 = (acc / t) * Math.PI * 2 - Math.PI/2;
     acc += e.value;
     const a1 = (acc / t) * Math.PI * 2 - Math.PI/2;
@@ -306,11 +372,18 @@ function Donut({ entries, size = 200, thickness = 26, total, centerLabel, center
 }
 
 // ── SPARKLINE ──────────────────────────────────────────────────────────────
-function Sparkline({ values, w = 100, h = 26, color = 'currentColor' }) {
+interface SparklineProps {
+  values: number[];
+  w?: number;
+  h?: number;
+  color?: string;
+}
+
+function Sparkline({ values, w = 100, h = 26, color = 'currentColor' }: SparklineProps) {
   if (!values.length) return null;
   const min = Math.min(...values), max = Math.max(...values);
   const r = max - min || 1;
-  const pts = values.map((v, i) => {
+  const pts = values.map((v: number, i: number) => {
     const x = (i / (values.length - 1)) * w;
     const y = h - 2 - ((v - min) / r) * (h - 4);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
@@ -323,12 +396,27 @@ function Sparkline({ values, w = 100, h = 26, color = 'currentColor' }) {
 }
 
 // ── SQUARIFIED TREEMAP (Bruls/Huijin/van Wijk — keeps rects close to square) ─
-function squarify(items, x0, y0, x1, y1) {
-  const layout = [];
+interface TreemapItem {
+  value: number;
+  label: string;
+  color: string;
+  icon?: string;
+  [key: string]: any;
+}
+
+interface LayoutItem extends TreemapItem {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+function squarify(items: TreemapItem[], x0: number, y0: number, x1: number, y1: number): LayoutItem[] {
+  const layout: LayoutItem[] = [];
   let remaining = items.slice().sort((a, b) => b.value - a.value);
   let rect = { x0, y0, x1, y1 };
 
-  const worst = (row, side, scale) => {
+  const worst = (row: TreemapItem[], side: number, scale: number) => {
     if (row.length === 0) return Infinity;
     let sum = 0, max = 0, min = Infinity;
     for (const it of row) {
@@ -347,8 +435,7 @@ function squarify(items, x0, y0, x1, y1) {
     const remainTotal = remaining.reduce((s, i) => s + i.value, 0) || 1;
     const scale = remainArea / remainTotal;
 
-    // Grow row while aspect ratios improve.
-    let row = [];
+    let row: TreemapItem[] = [];
     let i = 0;
     while (i < remaining.length) {
       const candidate = [...row, remaining[i]];
@@ -357,7 +444,6 @@ function squarify(items, x0, y0, x1, y1) {
       i++;
     }
 
-    // Lay out row along the shorter side.
     const rowSum = row.reduce((s, it) => s + it.value, 0);
     const rowArea = rowSum * scale;
     if (w >= h) {
@@ -384,10 +470,15 @@ function squarify(items, x0, y0, x1, y1) {
   return layout;
 }
 
-function Treemap({ items, height = 320 }) {
-  const wrapRef = useRef(null);
+interface TreemapProps {
+  items: TreemapItem[];
+  height?: number;
+}
+
+function Treemap({ items, height = 320 }: TreemapProps) {
+  const wrapRef = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(800);
-  const [hover, setHover] = useState(null);
+  const [hover, setHover] = useState<number | null>(null);
   useEffect(() => {
     if (!wrapRef.current) return;
     const ro = new ResizeObserver((entries) => { for (const e of entries) setW(Math.max(320, e.contentRect.width)); });
