@@ -1,8 +1,7 @@
 // Helpers — money, FX, derivations, chart primitives.
+import { FX, ACCOUNTS, SNAPSHOTS, INCOME, EXPENSES, TYPE_GROUP, GROUP_ORDER } from './data.js';
 
-const _FD = window.FinanceData;
-const FX_H = _FD.FX;
-// alias the data arrays without redeclaring (data.js already has them as top-level consts)
+const FX_H = FX;
 
 // ── FORMATTING ──────────────────────────────────────────────────────────────
 const fmtILS = (n, opts = {}) => {
@@ -299,7 +298,7 @@ function sliceByRange(series, range) {
   }
 }
 
-window.Fin = {
+const Fin = {
   fmtILS, fmtUSD, fmtPct, fmtSigned, fmtMonth,
   toILS, ALL_MONTHS, LATEST, last12, last24,
   accountById, balanceILS, netWorthAt, netWorthSeries,
@@ -313,3 +312,6 @@ window.Fin = {
   rebuildDerivations,
   sliceByRange, RANGE_OPTIONS,
 };
+
+export { Fin };
+window.Fin = Fin;

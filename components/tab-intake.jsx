@@ -1,3 +1,5 @@
+import React from 'react';
+import { Fin } from '../data/helpers.js';
 // Intake tab — paste free text or drop a file (PNG / JPG / PDF / CSV / XLSX),
 // the server extracts structured rows via Gemini, the user reviews them in a
 // table, then approves to write to the DB.
@@ -420,4 +422,4 @@ function IntakeTab({ onIngested }) {
   );
 }
 
-window.IntakeTab = IntakeTab;
+export { IntakeTab };

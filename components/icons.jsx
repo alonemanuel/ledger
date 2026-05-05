@@ -1,3 +1,4 @@
+import React from 'react';
 // Inline SVG icons — minimal stroke icons, no fills.
 // Usage: <Icon name="bank" size={16}/>
 
@@ -66,6 +67,4 @@ const CAT_ICON = {
   other: 'coin', uncategorized: 'question',
 };
 
-window.Icon = Icon;
-window.ACC_TYPE_ICON = ACC_TYPE_ICON;
-window.CAT_ICON = CAT_ICON;
+export { Icon, ACC_TYPE_ICON, CAT_ICON };

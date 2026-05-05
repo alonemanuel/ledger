@@ -1,5 +1,8 @@
+import React, { useState as useStateOv } from 'react';
+import { Fin } from '../data/helpers.js';
+import { Icon, ACC_TYPE_ICON } from './icons.jsx';
+import { LineChart, Donut, TimeRangeFilter } from './charts.jsx';
 // Tab: Overview
-const { useState: useStateOv } = React;
 
 function KPICard({ label, value, sub, trend }) {
   return (
@@ -160,4 +163,4 @@ function OverviewTab() {
   );
 }
 
-window.OverviewTab = OverviewTab;
+export { OverviewTab };

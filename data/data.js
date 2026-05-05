@@ -1,21 +1,21 @@
 // Empty data scaffold — populated at runtime by db-loader.js.
 // helpers.js relies on these top-level consts being declared.
 
-const FX = {
+export const FX = {
   current: 3.20,
   setOn: new Date().toISOString().slice(0, 10),
   byMonth: {},
   rateFor(ym) { return this.byMonth[ym] || this.current; },
 };
 
-const ACCOUNTS = [];
-const SNAPSHOTS = [];
-const INCOME = [];
-const EXPENSES = [];
+export const ACCOUNTS = [];
+export const SNAPSHOTS = [];
+export const INCOME = [];
+export const EXPENSES = [];
 
-const CATEGORIES = ['food','transport','housing','utilities','health','entertainment','travel','shopping','gifts','taxes','savings_transfer','fees','other'];
+export const CATEGORIES = ['food','transport','housing','utilities','health','entertainment','travel','shopping','gifts','taxes','savings_transfer','fees','other'];
 
-const TYPE_GROUP = {
+export const TYPE_GROUP = {
   checking: 'Cash / Checking', savings: 'Cash / Checking',
   money_market: 'Money Market',
   brokerage: 'Brokerage',
@@ -24,9 +24,9 @@ const TYPE_GROUP = {
   study_fund: 'Study Fund',
 };
 
-const GROUP_ORDER = ['Cash / Checking','Money Market','Brokerage','Pension','Provident','Study Fund'];
+export const GROUP_ORDER = ['Cash / Checking','Money Market','Brokerage','Pension','Provident','Study Fund'];
 
-const TYPE_ICON = {
+export const TYPE_ICON = {
   checking: '🏦', savings: '🏦',
   money_market: '💰',
   brokerage: '📈',
