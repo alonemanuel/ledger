@@ -1,11 +1,13 @@
-// Smoke test — builds dist/index.html, serves it locally, loads in headless
-// Chromium, and fails if the page is blank or threw any JS errors.
+// Smoke test — builds dist/, runs fast bundle checks, then loads in headless
+// Chromium to verify the page renders.
 //
-// Two passes:
+// Three stages:
+//   0. Bundle checks — fast Node-only assertions on the built output
 //   1. Example mode (VITE_EXAMPLE_MODE=true) — renders App directly
 //   2. Live mode (normal build) — renders Bootstrap, clicks "Load demo data"
 //
-// Catches TDZ / typo / missing-ref bugs before they reach prod.
+// Stage 0 catches missing assets / broken bundles in <1s without a browser.
+// Stages 1–2 verify the app actually renders.
 //
 // Run:  npm test
 // CI:   .github/workflows/test.yml
@@ -14,7 +16,7 @@ import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 
@@ -65,6 +67,26 @@ async function serve() {
   return { server, port: server.address().port };
 }
 
+function bundleCheck(label, checks) {
+  console.log(`▸ [${label}] Bundle checks…`);
+  const assetsDir = join(DIST, 'assets');
+  if (!existsSync(assetsDir)) throw new Error('dist/assets/ missing');
+  const jsFiles = readdirSync(assetsDir).filter(f => f.endsWith('.js'));
+  if (!jsFiles.length) throw new Error('No JS files in dist/assets/');
+  const bundle = jsFiles.map(f => readFileSync(join(assetsDir, f), 'utf8')).join('\n');
+  const html = readFileSync(join(DIST, 'index.html'), 'utf8');
+  const failures = [];
+  for (const { name, test } of checks) {
+    if (!test({ bundle, html, jsFiles })) failures.push(name);
+  }
+  if (failures.length) {
+    console.log(`  ❌ Failed: ${failures.join(', ')}`);
+    return false;
+  }
+  console.log(`  ✓ All ${checks.length} checks passed`);
+  return true;
+}
+
 function checkResults(label, rootText, pageErrors, consoleErrors) {
   const blank = rootText.trim().length < 50;
   const failed = pageErrors.length || consoleErrors.length || blank;
@@ -92,6 +114,15 @@ async function run() {
   // ── Pass 1: Example mode ──────────────────────────────────────────────
   console.log('▸ Pass 1: Example mode');
   await viteBuild({ VITE_EXAMPLE_MODE: 'true' });
+
+  if (!bundleCheck('example', [
+    { name: 'has React',       test: ({ bundle }) => bundle.includes('createElement') },
+    { name: 'has Fin helpers', test: ({ bundle }) => bundle.includes('fmtILS') },
+    { name: 'has demo data',   test: ({ bundle, jsFiles }) =>
+      jsFiles.some(f => f.includes('data.example')) || bundle.includes('ACCOUNTS') },
+    { name: 'index.html has module script', test: ({ html }) => html.includes('type="module"') },
+  ])) allPassed = false;
+
   const s1 = await serve();
 
   const ctx1 = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -113,6 +144,15 @@ async function run() {
   // ── Pass 2: Live mode + "Load demo data" button ──────────────────────
   console.log('\n▸ Pass 2: Live mode (demo-data button)');
   await viteBuild();
+
+  if (!bundleCheck('live', [
+    { name: 'has React',              test: ({ bundle }) => bundle.includes('createElement') },
+    { name: 'has Fin helpers',        test: ({ bundle }) => bundle.includes('fmtILS') },
+    { name: 'has DbLoader',           test: ({ bundle }) => bundle.includes('DbLoader') },
+    { name: 'has demo source inlined', test: ({ bundle }) => bundle.includes('__LEDGER_DEMO_SOURCE__') },
+    { name: 'has Bootstrap component', test: ({ bundle }) => bundle.includes('NEEDS_SIGNIN') },
+  ])) allPassed = false;
+
   const s2 = await serve();
 
   const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 800 } });
