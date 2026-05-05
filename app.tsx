@@ -1,33 +1,41 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import ReactDOM from 'react-dom/client';
 import './styles.css';
-import './data/data.js';
-import { Fin } from './data/helpers.js';
-import './data/db-loader.js';
+import './data/data.ts';
+import { Fin } from './data/helpers.ts';
+import './data/db-loader.ts';
 import demoSource from './data/data.example.js?raw';
 window.__LEDGER_DEMO_SOURCE__ = demoSource;
-import { useTweaks } from './tweaks-panel.jsx';
-import { Icon } from './components/icons.jsx';
-import { OverviewTab } from './components/tab-overview.jsx';
-import { AccountsTab } from './components/tab-accounts.jsx';
-import { CashflowTab } from './components/tab-cashflow.jsx';
-import { PassiveTab } from './components/tab-passive.jsx';
-import { IntakeTab } from './components/tab-intake.jsx';
+import { useTweaks } from './tweaks-panel.tsx';
+import { Icon } from './components/icons.tsx';
+import { OverviewTab } from './components/tab-overview.tsx';
+import { AccountsTab } from './components/tab-accounts.tsx';
+import { CashflowTab } from './components/tab-cashflow.tsx';
+import { PassiveTab } from './components/tab-passive.tsx';
+import { IntakeTab } from './components/tab-intake.tsx';
 import { Sidebar, useSidebar, SIDEBAR_WIDTH, SIDEBAR_RAIL } from './components/sidebar.jsx';
 // Main app — shell, header, sidebar, content.
 
 /* ── ErrorBoundary ────────────────────────────────────────────────────── */
-class ErrorBoundary extends React.Component {
-  constructor(props) {
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error, info) {
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('[ErrorBoundary]', error, info.componentStack);
   }
 
@@ -67,14 +75,22 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "privacy": false
 }/*EDITMODE-END*/;
 
-const ACCENT_PALETTES = {
+const ACCENT_PALETTES: Record<string, { accent: string; accent2: string }> = {
   ochre:     { accent: 'oklch(62% 0.13 65)', accent2: 'oklch(72% 0.10 80)' },
   terracotta:{ accent: 'oklch(58% 0.13 35)', accent2: 'oklch(68% 0.10 50)' },
   ink:       { accent: 'oklch(45% 0.10 250)', accent2: 'oklch(60% 0.08 230)' },
   moss:      { accent: 'oklch(54% 0.10 140)', accent2: 'oklch(66% 0.08 130)' },
 };
 
-function FxStrip({ rate, manualOpen, setManualOpen, manualRate, setManualRate }) {
+interface FxStripProps {
+  rate: number;
+  manualOpen: boolean;
+  setManualOpen: (v: boolean) => void;
+  manualRate: number;
+  setManualRate: (v: number) => void;
+}
+
+function FxStrip({ rate, manualOpen, setManualOpen, manualRate, setManualRate }: FxStripProps) {
   return (
     <div className={`fx-strip ${manualOpen ? 'open' : ''}`}>
       <button className="fx-summary" onClick={() => setManualOpen(!manualOpen)}>
@@ -106,18 +122,19 @@ function FxStrip({ rate, manualOpen, setManualOpen, manualRate, setManualRate })
   );
 }
 
-const TAB_IDS = ['overview', 'accounts', 'cashflow', 'passive', 'intake'];
+const TAB_IDS = ['overview', 'accounts', 'cashflow', 'passive', 'intake'] as const;
+type TabId = typeof TAB_IDS[number];
 
-function parseUrl() {
+function parseUrl(): { tab: string; accountId: string | null; section: string | null } {
   const segs = location.pathname.split('/').filter(Boolean);
-  const tab = TAB_IDS.includes(segs[0]) ? segs[0] : 'overview';
+  const tab = (TAB_IDS as readonly string[]).includes(segs[0]) ? segs[0] : 'overview';
   const accountId = (tab === 'accounts' && segs[1]) ? decodeURIComponent(segs[1]) : null;
   const section = location.hash ? location.hash.slice(1) : null;
   return { tab, accountId, section };
 }
 
-function pathFor(tab, accountId, section) {
-  let path;
+function pathFor(tab: string, accountId: string | null, section?: string | null): string {
+  let path: string;
   if (tab === 'accounts' && accountId) path = `/accounts/${encodeURIComponent(accountId)}`;
   else if (tab === 'overview') path = '/';
   else path = `/${tab}`;
@@ -133,10 +150,10 @@ function App() {
   const [dataTick, setDataTick] = useState(0);
   const sidebar = useSidebar();
 
-  const navigate = (tabId, sectionId) => {
-    setRoute({ tab: tabId, accountId: null, section: sectionId });
+  const navigate = (tabId: string, sectionId?: string | null) => {
+    setRoute({ tab: tabId, accountId: null, section: sectionId || null });
   };
-  const openAccount = (id) => setRoute({ tab: 'accounts', accountId: id, section: null });
+  const openAccount = (id: string) => setRoute({ tab: 'accounts', accountId: id, section: null });
   const closeAccount = () => setRoute({ tab: 'accounts', accountId: null, section: null });
 
   useEffect(() => { window.FinanceData.FX.current = manualRate; }, [manualRate]);
@@ -220,14 +237,13 @@ function App() {
           {tab === 'intake' && <IntakeTab onIngested={() => setDataTick(x => x + 1)}/>}
         </main>
       </div>
-
     </div>
   );
 }
 
 function Bootstrap() {
-  const [phase, setPhase] = useState('loading');   // loading | signin | fetching | ready | error
-  const [error, setError] = useState(null);
+  const [phase, setPhase] = useState<string>('loading');
+  const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
   const start = async () => {
@@ -236,7 +252,7 @@ function Bootstrap() {
       await window.DbLoader.init();
       await window.DbLoader.bootstrap();
       setTick(x => x + 1); setPhase('ready');
-    } catch (e) {
+    } catch (e: any) {
       if (e.message === 'NEEDS_SIGNIN') {
         setPhase('signin');
       } else {
@@ -251,7 +267,7 @@ function Bootstrap() {
       await window.DbLoader.requestSignIn();
       await window.DbLoader.fetchAndPopulate();
       setTick(x => x + 1); setPhase('ready');
-    } catch (e) {
+    } catch (e: any) {
       if (e.message === 'POPUP_BLOCKED') {
         setError('Pop-up blocked. Allow pop-ups for this site and try again, or use demo data.');
         setPhase('signin');
@@ -298,7 +314,7 @@ function Bootstrap() {
               try {
                 await window.DbLoader.loadDemoData();
                 setTick(x => x + 1); setPhase('ready');
-              } catch (e) {
+              } catch (e: any) {
                 setError(e.message || String(e)); setPhase('error');
               }
             }}>Load demo data</button>
@@ -319,10 +335,11 @@ function Bootstrap() {
 
 const isExample = import.meta.env.VITE_EXAMPLE_MODE === 'true';
 
-import { ACCOUNTS, SNAPSHOTS, INCOME, EXPENSES, FX } from './data/data.js';
+import { ACCOUNTS, SNAPSHOTS, INCOME, EXPENSES, FX } from './data/data.ts';
 
 async function mount() {
   if (isExample) {
+    // @ts-ignore side-effect script, not an ES module
     await import('./data/data.example.js');
     const ex = window.FinanceData;
     ACCOUNTS.length = 0; ACCOUNTS.push(...ex.ACCOUNTS);
@@ -335,7 +352,7 @@ async function mount() {
     FX.setOn = ex.FX.setOn;
     Fin.rebuildDerivations();
   }
-  ReactDOM.createRoot(document.getElementById('root')).render(
+  ReactDOM.createRoot(document.getElementById('root')!).render(
     isExample ? <App/> : <Bootstrap/>
   );
 }

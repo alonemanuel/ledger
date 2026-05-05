@@ -1,5 +1,5 @@
 import React from 'react';
-import { Fin } from '../data/helpers.js';
+import { Fin } from '../data/helpers.ts';
 // Intake tab — paste free text or drop a file (PNG / JPG / PDF / CSV / XLSX),
 // the server extracts structured rows via Gemini, the user reviews them in a
 // table, then approves to write to the DB.
@@ -8,12 +8,34 @@ const MAX_FILE_BYTES = 3 * 1024 * 1024;
 const MAX_TEXT_BYTES = 1 * 1024 * 1024;
 const MAX_CSV_ROWS = 500;
 
-function readFileAsBase64(file) {
+interface IntakePayload {
+  kind: string;
+  content?: string;
+  mediaType?: string;
+  fileName?: string | null;
+}
+
+interface ExtractionResult {
+  expenses?: any[];
+  income?: any[];
+  snapshots?: any[];
+  rejected?: any[];
+  model?: string;
+  total_ms?: number;
+  truncated?: boolean;
+}
+
+interface StatusInfo {
+  kind: string;
+  msg: string;
+}
+
+function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const fr = new FileReader();
     fr.onerror = () => reject(new Error('File read failed'));
     fr.onload = () => {
-      const result = fr.result || '';
+      const result = (fr.result as string) || '';
       const comma = result.indexOf(',');
       resolve(comma >= 0 ? result.slice(comma + 1) : result);
     };
@@ -21,7 +43,7 @@ function readFileAsBase64(file) {
   });
 }
 
-async function fileToPayload(file) {
+async function fileToPayload(file: File): Promise<IntakePayload> {
   if (!file) throw new Error('No file');
   if (file.size > MAX_FILE_BYTES) {
     throw new Error(`File too large (${(file.size/1024/1024).toFixed(1)} MB). Limit is ${MAX_FILE_BYTES/1024/1024} MB.`);
@@ -42,9 +64,9 @@ async function fileToPayload(file) {
   if (ext === 'xlsx' || type.includes('spreadsheetml')) {
     if (!window.XLSX) throw new Error('XLSX parser not loaded');
     const buf = await file.arrayBuffer();
-    const wb = window.XLSX.read(buf, { type: 'array', cellDates: true });
+    const wb = (window.XLSX as any).read(buf, { type: 'array', cellDates: true });
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const csv = window.XLSX.utils.sheet_to_csv(ws, { dateNF: 'yyyy-mm-dd' });
+    const csv = (window.XLSX as any).utils.sheet_to_csv(ws, { dateNF: 'yyyy-mm-dd' });
     if (csv.split('\n').length > MAX_CSV_ROWS + 1) {
       throw new Error(`XLSX has more than ${MAX_CSV_ROWS} rows; please trim before uploading.`);
     }
@@ -58,7 +80,7 @@ async function fileToPayload(file) {
   return { kind: 'text', content: text, fileName };
 }
 
-async function postExtract(payload) {
+async function postExtract(payload: IntakePayload): Promise<any> {
   const token = window.DbLoader?.getCurrentToken?.() || null;
   const accounts = (window.FinanceData?.ACCOUNTS || []).map(a => ({
     id: a.id, nickname: a.name, type: a.type, currency: a.currency,
@@ -80,7 +102,7 @@ async function postExtract(payload) {
   return await res.json();
 }
 
-async function postApprove(rows, tab) {
+async function postApprove(rows: any[], tab: string): Promise<any> {
   const token = window.DbLoader?.getCurrentToken?.() || null;
   const res = await fetch(`/api/${tab}`, {
     method: 'POST',
@@ -99,7 +121,16 @@ async function postApprove(rows, tab) {
 
 // ── Review table for extracted rows ─────────────────────────────────────────
 
-function ReviewTable({ expenses, income, snapshots, onApprove, onCancel, busy }) {
+interface ReviewTableProps {
+  expenses: any[];
+  income: any[];
+  snapshots: any[];
+  onApprove: () => void;
+  onCancel: () => void;
+  busy: boolean;
+}
+
+function ReviewTable({ expenses, income, snapshots, onApprove, onCancel, busy }: ReviewTableProps) {
   const total = expenses.length + income.length + snapshots.length;
   if (!total) return null;
 
@@ -126,7 +157,7 @@ function ReviewTable({ expenses, income, snapshots, onApprove, onCancel, busy })
               </tr>
             </thead>
             <tbody>
-              {expenses.map((e, i) => (
+              {expenses.map((e: any, i: number) => (
                 <tr key={i}>
                   <td className="mono">{e.date}</td>
                   <td>{e.merchant}</td>
@@ -148,7 +179,7 @@ function ReviewTable({ expenses, income, snapshots, onApprove, onCancel, busy })
           <table className="data-tbl compact">
             <thead><tr><th>Date</th><th>Source</th><th>Type</th><th className="r">Amount</th><th>Currency</th></tr></thead>
             <tbody>
-              {income.map((r, i) => (
+              {income.map((r: any, i: number) => (
                 <tr key={i}>
                   <td className="mono">{r.date}</td>
                   <td>{r.source}</td>
@@ -168,7 +199,7 @@ function ReviewTable({ expenses, income, snapshots, onApprove, onCancel, busy })
           <table className="data-tbl compact">
             <thead><tr><th>Date</th><th>Account</th><th className="r">Balance</th><th>Currency</th></tr></thead>
             <tbody>
-              {snapshots.map((s, i) => (
+              {snapshots.map((s: any, i: number) => (
                 <tr key={i}>
                   <td className="mono">{s.date}</td>
                   <td>{s.account_id}</td>
@@ -193,16 +224,16 @@ function ReviewTable({ expenses, income, snapshots, onApprove, onCancel, busy })
 
 // ── Main IntakeTab ──────────────────────────────────────────────────────────
 
-function IntakeTab({ onIngested }) {
+function IntakeTab({ onIngested }: { onIngested?: () => void }) {
   const { useState, useRef, useEffect } = React;
   const [text, setText] = useState('');
   const [phase, setPhase] = useState('input');  // input | extracting | review | saving | done
-  const [status, setStatus] = useState(null);
+  const [status, setStatus] = useState<StatusInfo | null>(null);
   const [drop, setDrop] = useState(false);
-  const [busyStartedAt, setBusyStartedAt] = useState(null);
+  const [busyStartedAt, setBusyStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
-  const [extraction, setExtraction] = useState(null);
-  const fileInputRef = useRef(null);
+  const [extraction, setExtraction] = useState<ExtractionResult | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!busyStartedAt) return;
@@ -221,7 +252,7 @@ function IntakeTab({ onIngested }) {
     );
   }
 
-  const extract = async (payload) => {
+  const extract = async (payload: IntakePayload) => {
     setPhase('extracting');
     setStatus({ kind: 'busy', msg: `Sending ${Math.round((payload.content?.length || 0) / 1024)} KB ${payload.kind} to model…` });
     setBusyStartedAt(Date.now());
@@ -254,7 +285,7 @@ function IntakeTab({ onIngested }) {
         setStatus({ kind: 'ok', msg: `Extracted ${total} rows${warn}${meta}` });
         setPhase('review');
       }
-    } catch (e) {
+    } catch (e: any) {
       setStatus({ kind: 'err', msg: e.message || String(e) });
       setPhase('input');
     } finally {
@@ -267,13 +298,13 @@ function IntakeTab({ onIngested }) {
     setPhase('saving');
     setBusyStartedAt(Date.now());
     try {
-      const errors = [];
+      const errors: string[] = [];
       let totalInserted = 0;
 
-      for (const [tab, rows] of [['expenses', extraction.expenses], ['income', extraction.income], ['snapshots', extraction.snapshots]]) {
+      for (const [tab, rows] of [['expenses', extraction.expenses], ['income', extraction.income], ['snapshots', extraction.snapshots]] as [string, any[]][]) {
         if (!rows?.length) continue;
         try {
-          const mapRow = tab === 'expenses' ? (r) => {
+          const mapRow = tab === 'expenses' ? (r: any) => {
             const pa = parseFloat(r.purchase_amount) || 0;
             const ca = parseFloat(r.charge_amount_ils) || pa;
             const pc = r.purchase_currency || 'ILS';
@@ -284,10 +315,10 @@ function IntakeTab({ onIngested }) {
               source_doc: r.source_doc || null, billing_date: r.billing_date || null,
               external_ref_id: r.external_ref_id || null,
             };
-          } : (r) => r;
+          } : (r: any) => r;
           const result = await postApprove(rows.map(mapRow), tab);
           totalInserted += result.inserted || 0;
-        } catch (e) {
+        } catch (e: any) {
           errors.push(`${tab}: ${e.message}`);
         }
       }
@@ -303,7 +334,7 @@ function IntakeTab({ onIngested }) {
       setText('');
       setPhase('input');
       if (totalInserted > 0 && onIngested) onIngested();
-    } catch (e) {
+    } catch (e: any) {
       setStatus({ kind: 'err', msg: e.message || String(e) });
       setPhase('review');
     } finally {
@@ -319,28 +350,28 @@ function IntakeTab({ onIngested }) {
 
   const onSubmitText = async () => {
     try {
-      const payload = { kind: 'text', content: text };
+      const payload: IntakePayload = { kind: 'text', content: text };
       if (!text?.trim()) throw new Error('Nothing to send');
       if (text.length > MAX_TEXT_BYTES) throw new Error('Text too large');
       await extract(payload);
-    } catch (e) {
+    } catch (e: any) {
       setStatus({ kind: 'err', msg: e.message || String(e) });
     }
   };
 
-  const onPickFile = async (file) => {
+  const onPickFile = async (file: File | undefined | null) => {
     if (!file) return;
     try {
       const payload = await fileToPayload(file);
       await extract(payload);
-    } catch (e) {
+    } catch (e: any) {
       setStatus({ kind: 'err', msg: e.message || String(e) });
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  const onDrop = (e) => {
+  const onDrop = (e: React.DragEvent) => {
     e.preventDefault(); setDrop(false);
     const f = e.dataTransfer?.files?.[0];
     if (f) onPickFile(f);
@@ -403,7 +434,7 @@ function IntakeTab({ onIngested }) {
           snapshots={extraction.snapshots || []}
           onApprove={approve}
           onCancel={cancel}
-          busy={phase === 'saving'}
+          busy={phase as string === 'saving'}
         />
       )}
 

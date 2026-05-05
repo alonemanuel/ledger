@@ -1,17 +1,17 @@
 import React, { useState as useStatePi, useMemo as useMemoPi } from 'react';
-import { Fin } from '../data/helpers.js';
-import { Icon, ACC_TYPE_ICON } from './icons.jsx';
-import { StackedBar } from './charts.jsx';
+import { Fin } from '../data/helpers.ts';
+import { Icon, ACC_TYPE_ICON } from './icons.tsx';
+import { StackedBar } from './charts.tsx';
 // Tab: Passive Income
 
-function PassiveTab() {
+function PassiveTab({ section }: { section?: string | null }) {
   const [windowMonths, setWindowMonths] = useStatePi(12);
   const months = Fin.ALL_MONTHS.slice(-windowMonths);
 
   const passiveTypes = ['dividend','interest','capital_gain_realized','employer_pension_contribution','employer_study_fund_contribution'];
 
   const stacked = months.map(ym => {
-    const row = { ym };
+    const row: Record<string, any> = { ym };
     const all = Fin.incomeByTypeMonth(ym);
     passiveTypes.forEach(t => row[t] = all[t] || 0);
     return row;

@@ -1,10 +1,18 @@
 import React, { useState as useStateOv } from 'react';
-import { Fin } from '../data/helpers.js';
-import { Icon, ACC_TYPE_ICON } from './icons.jsx';
-import { LineChart, Donut, TimeRangeFilter } from './charts.jsx';
+import { Fin } from '../data/helpers.ts';
+import { Icon, ACC_TYPE_ICON } from './icons.tsx';
+import { LineChart, Donut, TimeRangeFilter } from './charts.tsx';
+import type { Account } from '../types.ts';
 // Tab: Overview
 
-function KPICard({ label, value, sub, trend }) {
+interface KPICardProps {
+  label: string;
+  value: string;
+  sub?: React.ReactNode;
+  trend?: string;
+}
+
+function KPICard({ label, value, sub, trend }: KPICardProps) {
   return (
     <div className="kpi">
       <div className="kpi-label">{label}</div>
@@ -14,12 +22,11 @@ function KPICard({ label, value, sub, trend }) {
   );
 }
 
-function NetWorthChart({ ownerFilter }) {
+function NetWorthChart({ ownerFilter }: { ownerFilter: string }) {
   const [range, setRange] = useStateOv('1Y');
-  const accFilter = ownerFilter === 'both' ? () => true : (a) => a.owner === ownerFilter;
+  const accFilter = ownerFilter === 'both' ? () => true : (a: Account) => a.owner === ownerFilter;
   const accs = window.FinanceData.ACCOUNTS.filter(accFilter);
   const series = Fin.netWorthSeries(Fin.ALL_MONTHS, accFilter);
-  // also produce per-account ILS contribution for hover breakdown
   const breakdown = series.map(s => {
     const parts = accs
       .map(a => ({ acc: a, value: Fin.balanceILS(a.id, s.ym) }))
@@ -36,10 +43,10 @@ function NetWorthChart({ ownerFilter }) {
       <LineChart
         data={sliced}
         height={260}
-        formatY={(v) => Fin.fmtILS(v, { compact: true })}
-        tooltipExtra={(d) => (
+        formatY={(v: number) => Fin.fmtILS(v, { compact: true })}
+        tooltipExtra={(d: any) => (
           <div className="tt-breakdown">
-            {d.parts.slice(0, 6).map(p => (
+            {d.parts.slice(0, 6).map((p: any) => (
               <div key={p.acc.id} className="tt-row">
                 <Icon name={ACC_TYPE_ICON[p.acc.type]} size={11}/>
                 <span className="tt-key">{p.acc.name} <span className="muted">{p.acc.owner}</span></span>
@@ -54,9 +61,16 @@ function NetWorthChart({ ownerFilter }) {
   );
 }
 
-function DonutCard({ title, entries, centerLabel, centerValue }) {
-  const [hover, setHover] = useStateOv(null);
-  const total = entries.reduce((s, e) => s + e.value, 0);
+interface DonutCardProps {
+  title: string;
+  entries: { label: string; value: number; color: string }[];
+  centerLabel: string;
+  centerValue: string;
+}
+
+function DonutCard({ title, entries, centerLabel, centerValue }: DonutCardProps) {
+  const [hover, setHover] = useStateOv<number | null>(null);
+  const total = entries.reduce((s: number, e: { value: number }) => s + e.value, 0);
   const active = hover != null ? entries[hover] : null;
   return (
     <section className="panel square">
@@ -68,7 +82,7 @@ function DonutCard({ title, entries, centerLabel, centerValue }) {
         hover={hover} onHover={setHover}
       />
       <ul className="legend">
-        {entries.map((e, i) => (
+        {entries.map((e: { label: string; value: number; color: string }, i: number) => (
           <li key={e.label}
             className={hover === i ? 'on' : hover != null ? 'off' : ''}
             onMouseEnter={() => setHover(i)}
@@ -83,17 +97,16 @@ function DonutCard({ title, entries, centerLabel, centerValue }) {
   );
 }
 
-function OverviewTab() {
+function OverviewTab({ section }: { section?: string | null }) {
   const [ownerFilter, setOwnerFilter] = useStateOv('both');
-  const accFilter = ownerFilter === 'both' ? () => true : (a) => a.owner === ownerFilter;
+  const accFilter = ownerFilter === 'both' ? () => true : (a: Account) => a.owner === ownerFilter;
 
   const nw = Fin.netWorthAt(Fin.LATEST, accFilter);
   const nwPrev = Fin.netWorthAt(Fin.ALL_MONTHS[Fin.ALL_MONTHS.length - 2], accFilter);
   const delta = nw - nwPrev;
 
-  // Avg monthly (for cashflow side, not filtered by owner — household)
-  const inc12 = Fin.last12.reduce((s, ym) => s + Fin.incomeInMonth(ym), 0);
-  const exp12 = Fin.last12.reduce((s, ym) => s + Fin.expenseInMonth(ym), 0);
+  const inc12 = Fin.last12.reduce((s: number, ym: string) => s + Fin.incomeInMonth(ym), 0);
+  const exp12 = Fin.last12.reduce((s: number, ym: string) => s + Fin.expenseInMonth(ym), 0);
   const avgInc = inc12 / 12, avgExp = exp12 / 12;
 
   const groups = Fin.groupedAssets(Fin.LATEST, accFilter);
@@ -121,9 +134,9 @@ function OverviewTab() {
 
       <div className="kpi-grid">
         <KPICard label="Net worth" value={Fin.fmtILS(nw)} sub={<><span className="private">{Fin.fmtSigned(delta)}</span> MoM</>} trend={delta >= 0 ? 'up' : 'down'}/>
-        <KPICard label="Δ MoM" value={Fin.fmtSigned(delta, (v) => Fin.fmtILS(v, { compact: true }))} sub={<><span className="private">{((delta/nwPrev)*100).toFixed(2)}%</span> change</>} trend={delta >= 0 ? 'up' : 'down'}/>
+        <KPICard label="Δ MoM" value={Fin.fmtSigned(delta, (v: number) => Fin.fmtILS(v, { compact: true }))} sub={<><span className="private">{((delta/nwPrev)*100).toFixed(2)}%</span> change</>} trend={delta >= 0 ? 'up' : 'down'}/>
         <KPICard label="Avg monthly income" value={Fin.fmtILS(avgInc, { compact: true })} sub={`12-mo trailing`}/>
-        <KPICard label="Avg monthly spend" value={Fin.fmtILS(avgExp, { compact: true })} sub={<>net <span className="private">{Fin.fmtSigned(avgInc - avgExp, (v) => Fin.fmtILS(v, { compact: true }))}</span> / mo</>} trend={(avgInc - avgExp) >= 0 ? 'up' : 'down'}/>
+        <KPICard label="Avg monthly spend" value={Fin.fmtILS(avgExp, { compact: true })} sub={<>net <span className="private">{Fin.fmtSigned(avgInc - avgExp, (v: number) => Fin.fmtILS(v, { compact: true }))}</span> / mo</>} trend={(avgInc - avgExp) >= 0 ? 'up' : 'down'}/>
       </div>
 
       <section className="panel">
