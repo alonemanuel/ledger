@@ -3,6 +3,11 @@ import { Fin } from '../data/helpers.ts';
 import { Icon, CAT_ICON } from './icons.tsx';
 import { PairedBars, StackedBar, Treemap } from './charts.tsx';
 
+const CASHFLOW_SECTIONS = [
+  { id: 'trends', label: 'Trends' },
+  { id: 'month',  label: 'Month View' },
+];
+
 const CF_SAVINGS_LS = 'ledger_cashflow_show_savings';
 
 function CashflowTab({ section }: { section?: string | null }) {
@@ -139,7 +144,7 @@ function CashflowTab({ section }: { section?: string | null }) {
       </div>
 
       {/* ── OVERALL: TRENDS ─────────────────────────────────────────────── */}
-      <section className="panel">
+      <section className="panel" data-section="trends">
         <header className="panel-h"><h3>Income vs Expense</h3><span className="panel-sub">click a month to drill down</span></header>
         <PairedBars data={ie} height={280} onBarClick={setSelectedMonth} activeYm={selectedMonth}/>
         <div className="legend-row">
@@ -168,7 +173,7 @@ function CashflowTab({ section }: { section?: string | null }) {
       </section>
 
       {/* ── MONTH DETAIL ────────────────────────────────────────────────── */}
-      <div className="month-picker">
+      <div className="month-picker" data-section="month">
         <button className="month-picker-arrow" disabled={!hasPrev}
           onClick={() => hasPrev && setSelectedMonth(Fin.ALL_MONTHS[monthIdx - 1])}>
           ‹
@@ -323,4 +328,4 @@ function CashflowTab({ section }: { section?: string | null }) {
   );
 }
 
-export { CashflowTab };
+export { CashflowTab, CASHFLOW_SECTIONS };
