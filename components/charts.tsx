@@ -233,9 +233,11 @@ interface PairedBarsProps {
   data: PairedBarDataPoint[];
   height?: number;
   padding?: ChartPadding;
+  onBarClick?: (ym: string) => void;
+  activeYm?: string | null;
 }
 
-function PairedBars({ data, height = 260, padding = { l: 56, r: 16, t: 16, b: 28 } }: PairedBarsProps) {
+function PairedBars({ data, height = 260, padding = { l: 56, r: 16, t: 16, b: 28 }, onBarClick, activeYm }: PairedBarsProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(800);
   useEffect(() => {
@@ -278,7 +280,14 @@ function PairedBars({ data, height = 260, padding = { l: 56, r: 16, t: 16, b: 28
           const invH = ((d.investment || 0)/maxV) * innerH;
           const baseY = padding.t + innerH;
           return (
-            <g key={i} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} opacity={hover == null || hover === i ? 1 : 0.5}>
+            <g key={i} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}
+               onClick={() => onBarClick?.(d.ym)}
+               style={{ cursor: onBarClick ? 'pointer' : 'default' }}
+               opacity={hover == null || hover === i ? 1 : 0.5}>
+              {activeYm === d.ym && (
+                <rect x={cx - barW - 5} y={padding.t} width={barW * 2 + 14} height={innerH}
+                  fill="var(--accent)" opacity="0.08" rx="3"/>
+              )}
               <rect x={cx - barW - 2} y={baseY - incH} width={barW} height={incH} fill={INCOME_COLOR}/>
               <rect x={cx + 2}        y={baseY - expH} width={barW} height={expH} fill={EXPENSE_COLOR}/>
               {invH > 0 && (

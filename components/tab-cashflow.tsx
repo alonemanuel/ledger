@@ -1,9 +1,7 @@
 import React, { useState as useStateCf } from 'react';
 import { Fin } from '../data/helpers.ts';
-import { CATEGORIES } from '../data/data.ts';
 import { Icon, CAT_ICON } from './icons.tsx';
 import { PairedBars, StackedBar, Treemap } from './charts.tsx';
-// Tab: Cashflow
 
 const CF_SAVINGS_LS = 'ledger_cashflow_show_savings';
 
@@ -15,14 +13,18 @@ function CashflowTab({ section }: { section?: string | null }) {
     try { return localStorage.getItem(CF_SAVINGS_LS) !== 'false'; }
     catch (_) { return true; }
   });
+  const [selectedMonth, setSelectedMonth] = useStateCf(Fin.LATEST);
   const [expSort, setExpSort] = useStateCf<{ col: string; dir: string }>({ col: 'amount', dir: 'desc' });
+
   const setShowSavings = (v: boolean) => {
     setShowSavingsState(v);
     try { localStorage.setItem(CF_SAVINGS_LS, String(v)); } catch (_) {}
   };
 
-  const months = Fin.ALL_MONTHS.slice(-windowMonths);
   const matchOwner = (rec: { owner: string }) => ownerFilter === 'all' || rec.owner === ownerFilter;
+
+  // ── Overall section data (scoped by windowMonths) ──────────────────────
+  const months = Fin.ALL_MONTHS.slice(-windowMonths);
 
   const ie = months.map(ym => {
     const inc = window.FinanceData.INCOME
@@ -54,29 +56,43 @@ function CashflowTab({ section }: { section?: string | null }) {
   });
   const allExpKeys = [...expCats, 'uncategorized'];
 
-  const last3 = Fin.ALL_MONTHS.slice(-3);
-  const cat3: Record<string, number> = {};
-  window.FinanceData.EXPENSES
-    .filter(e => last3.includes(e.ym) && matchOwner(e))
-    .forEach(e => {
-      const k = e.category || 'uncategorized';
-      cat3[k] = (cat3[k] || 0) + Fin.toILS(e.amount, e.currency, e.ym);
-    });
-  const treemapItems = Object.entries(cat3)
-    .sort((a, b) => (b[1] as number) - (a[1] as number))
+  // ── Month detail data (scoped by selectedMonth) ────────────────────────
+  const monthIdx = Fin.ALL_MONTHS.indexOf(selectedMonth);
+  const hasPrev = monthIdx > 0;
+  const hasNext = monthIdx < Fin.ALL_MONTHS.length - 1;
+
+  const monthIncome = window.FinanceData.INCOME
+    .filter(i => i.ym === selectedMonth && matchOwner(i))
+    .reduce((s, i) => s + Fin.toILS(i.amount, i.currency, i.ym), 0);
+
+  const monthExpensesRaw = window.FinanceData.EXPENSES
+    .filter(e => e.ym === selectedMonth && matchOwner(e));
+
+  let monthExpenseTotal = 0, monthInvestmentTotal = 0;
+  monthExpensesRaw.forEach(e => {
+    const v = Fin.toILS(e.amount, e.currency, e.ym);
+    if (Fin.isInvestment(e)) monthInvestmentTotal += v; else monthExpenseTotal += v;
+  });
+
+  const monthCats: Record<string, number> = {};
+  monthExpensesRaw.forEach(e => {
+    const k = e.category || 'uncategorized';
+    monthCats[k] = (monthCats[k] || 0) + Fin.toILS(e.amount, e.currency, e.ym);
+  });
+  const monthTreemapItems = Object.entries(monthCats)
+    .sort((a, b) => b[1] - a[1])
     .map(([k, v]) => ({
-      label: Fin.PRETTY_CAT[k] || k, value: v as number,
+      label: Fin.PRETTY_CAT[k] || k, value: v,
       color: Fin.CATEGORY_COLOR[k] || 'var(--rule)',
       icon: CAT_ICON[k],
     }));
 
-  const topSpend = window.FinanceData.EXPENSES
-    .filter(e => months.includes(e.ym) && matchOwner(e))
+  const monthTopSpend = monthExpensesRaw
+    .slice()
     .sort((a, b) => Fin.toILS(b.amount, b.currency, b.ym) - Fin.toILS(a.amount, a.currency, a.ym))
     .slice(0, 5);
 
-  const sortedExpenses = window.FinanceData.EXPENSES
-    .filter(e => months.includes(e.ym) && matchOwner(e))
+  const monthSortedExpenses = monthExpensesRaw
     .slice()
     .sort((a, b) => {
       const sign = expSort.dir === 'asc' ? 1 : -1;
@@ -90,16 +106,19 @@ function CashflowTab({ section }: { section?: string | null }) {
     s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'desc' }
   );
 
-  const mystery = window.FinanceData.EXPENSES.filter(e => !e.category && months.includes(e.ym) && matchOwner(e));
+  const monthMystery = monthExpensesRaw.filter(e => !e.category);
 
   const catTx = openCat
-    ? window.FinanceData.EXPENSES
-        .filter(e => (e.category === openCat) && months.includes(e.ym) && matchOwner(e))
-        .sort((a,b) => b.date.localeCompare(a.date))
+    ? monthExpensesRaw
+        .filter(e => e.category === openCat)
+        .sort((a, b) => b.date.localeCompare(a.date))
     : [];
+
+  const monthNet = monthIncome - monthExpenseTotal - monthInvestmentTotal;
 
   return (
     <div className="tab tab-cashflow">
+      {/* ── OVERALL TOOLBAR ─────────────────────────────────────────────── */}
       <div className="row-toolbar sticky-toolbar">
         <div className="seg">
           {[6,12,24].map(n => (
@@ -119,9 +138,10 @@ function CashflowTab({ section }: { section?: string | null }) {
         <span className="total-pill">In <span className="private">{Fin.fmtILS(ie.reduce((s,x)=>s+x.income,0), { compact: true })}</span> · Out <span className="private">{Fin.fmtILS(ie.reduce((s,x)=>s + x.expense + (x.investment||0), 0), { compact: true })}</span></span>
       </div>
 
+      {/* ── OVERALL: TRENDS ─────────────────────────────────────────────── */}
       <section className="panel">
-        <header className="panel-h"><h3>Income vs Expense</h3><span className="panel-sub">net cashflow line overlay</span></header>
-        <PairedBars data={ie} height={280}/>
+        <header className="panel-h"><h3>Income vs Expense</h3><span className="panel-sub">click a month to drill down</span></header>
+        <PairedBars data={ie} height={280} onBarClick={setSelectedMonth} activeYm={selectedMonth}/>
         <div className="legend-row">
           <span><span className="sw" style={{ background: 'oklch(58% 0.08 140)' }}></span>Income</span>
           <span><span className="sw" style={{ background: 'oklch(58% 0.09 30)' }}></span>Expense</span>
@@ -147,36 +167,74 @@ function CashflowTab({ section }: { section?: string | null }) {
         </ul>
       </section>
 
-      <section className="panel">
-        <header className="panel-h"><h3>Last 3 months — categories</h3><span className="panel-sub">{Fin.fmtMonth(last3[0])} → {Fin.fmtMonth(last3[2])}</span></header>
-        <Treemap items={treemapItems} height={320}/>
-      </section>
+      {/* ── MONTH DETAIL ────────────────────────────────────────────────── */}
+      <div className="month-picker">
+        <button className="month-picker-arrow" disabled={!hasPrev}
+          onClick={() => hasPrev && setSelectedMonth(Fin.ALL_MONTHS[monthIdx - 1])}>
+          ‹
+        </button>
+        <span className="month-picker-label">{Fin.fmtMonth(selectedMonth)}</span>
+        <button className="month-picker-arrow" disabled={!hasNext}
+          onClick={() => hasNext && setSelectedMonth(Fin.ALL_MONTHS[monthIdx + 1])}>
+          ›
+        </button>
+      </div>
+
+      <div className="month-summary">
+        <div className="month-summary-item">
+          <span className="month-summary-label">Income</span>
+          <span className="month-summary-value private pos">{Fin.fmtILS(monthIncome, { compact: true })}</span>
+        </div>
+        <div className="month-summary-item">
+          <span className="month-summary-label">Expenses</span>
+          <span className="month-summary-value private neg">{Fin.fmtILS(monthExpenseTotal, { compact: true })}</span>
+        </div>
+        {monthInvestmentTotal > 0 && (
+          <div className="month-summary-item">
+            <span className="month-summary-label">Savings</span>
+            <span className="month-summary-value private">{Fin.fmtILS(monthInvestmentTotal, { compact: true })}</span>
+          </div>
+        )}
+        <div className="month-summary-item">
+          <span className="month-summary-label">Net</span>
+          <span className={`month-summary-value private ${monthNet >= 0 ? 'pos' : 'neg'}`}>{Fin.fmtSigned(monthNet, n => Fin.fmtILS(n, { compact: true }))}</span>
+        </div>
+      </div>
+
+      {monthTreemapItems.length > 0 && (
+        <section className="panel">
+          <header className="panel-h"><h3>Categories</h3><span className="panel-sub">{Fin.fmtMonth(selectedMonth)}</span></header>
+          <Treemap items={monthTreemapItems} height={280}/>
+        </section>
+      )}
+
+      {monthTopSpend.length > 0 && (
+        <section className="panel">
+          <header className="panel-h"><h3>Top spendings</h3><span className="panel-sub">{Fin.fmtMonth(selectedMonth)}</span></header>
+          <table className="data-tbl compact">
+            <thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th>Owner</th><th className="r">Amount</th></tr></thead>
+            <tbody>
+              {monthTopSpend.map(e => (
+                <tr key={e.id}>
+                  <td className="mono">{e.date}</td>
+                  <td>{e.merchant}</td>
+                  <td>
+                    <span className="cat-pill" style={{ '--c': Fin.CATEGORY_COLOR[e.category || 'uncategorized'] } as React.CSSProperties}>
+                      <Icon name={CAT_ICON[e.category || 'uncategorized']} size={11}/>
+                      {Fin.PRETTY_CAT[e.category ?? ''] || e.category || '—'}
+                    </span>
+                  </td>
+                  <td>{e.owner}</td>
+                  <td className="r mono private">{Fin.fmtILS(e.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       <section className="panel">
-        <header className="panel-h"><h3>Top spendings</h3><span className="panel-sub">single largest transactions · {windowMonths}m</span></header>
-        <table className="data-tbl compact">
-          <thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th>Owner</th><th className="r">Amount</th></tr></thead>
-          <tbody>
-            {topSpend.map(e => (
-              <tr key={e.id}>
-                <td className="mono">{e.date}</td>
-                <td>{e.merchant}</td>
-                <td>
-                  <span className="cat-pill" style={{ '--c': Fin.CATEGORY_COLOR[e.category || 'uncategorized'] } as React.CSSProperties}>
-                    <Icon name={CAT_ICON[e.category || 'uncategorized']} size={11}/>
-                    {Fin.PRETTY_CAT[e.category ?? ''] || e.category || '—'}
-                  </span>
-                </td>
-                <td>{e.owner}</td>
-                <td className="r mono private">{Fin.fmtILS(e.amount)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-
-      <section className="panel">
-        <header className="panel-h"><h3>Expenses</h3><span className="panel-sub">{sortedExpenses.length} transactions · {windowMonths}m</span></header>
+        <header className="panel-h"><h3>Expenses</h3><span className="panel-sub">{monthSortedExpenses.length} transactions · {Fin.fmtMonth(selectedMonth)}</span></header>
         <div style={{ overflowX: 'auto' }}>
         <table className="data-tbl compact">
           <thead>
@@ -192,7 +250,10 @@ function CashflowTab({ section }: { section?: string | null }) {
             </tr>
           </thead>
           <tbody>
-            {sortedExpenses.map(e => (
+            {monthSortedExpenses.length === 0 && (
+              <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '24px' }}>No expenses in {Fin.fmtMonth(selectedMonth)}</td></tr>
+            )}
+            {monthSortedExpenses.map(e => (
               <tr key={e.id}>
                 <td className="mono">{e.date}</td>
                 <td>{e.merchant}</td>
@@ -214,13 +275,13 @@ function CashflowTab({ section }: { section?: string | null }) {
         </div>
       </section>
 
-      {mystery.length > 0 && (
+      {monthMystery.length > 0 && (
         <section className="panel mystery">
-          <header className="panel-h"><h3>⚠ Uncategorized</h3><span className="panel-sub">{mystery.length} rows · <span className="private">{Fin.fmtILS(mystery.reduce((s,e)=>s+Fin.toILS(e.amount,e.currency,e.ym),0))}</span></span></header>
+          <header className="panel-h"><h3>⚠ Uncategorized</h3><span className="panel-sub">{monthMystery.length} rows · <span className="private">{Fin.fmtILS(monthMystery.reduce((s,e)=>s+Fin.toILS(e.amount,e.currency,e.ym),0))}</span></span></header>
           <table className="data-tbl compact">
             <thead><tr><th>Date</th><th>Merchant</th><th>Owner</th><th className="r">Amount</th></tr></thead>
             <tbody>
-              {mystery.slice(0, 8).map(e => (
+              {monthMystery.slice(0, 8).map(e => (
                 <tr key={e.id}>
                   <td className="mono">{e.date}</td>
                   <td>{e.merchant}</td>
@@ -237,7 +298,7 @@ function CashflowTab({ section }: { section?: string | null }) {
         <div className="modal" onClick={() => setOpenCat(null)}>
           <div className="modal-card" onClick={e => e.stopPropagation()}>
             <header className="panel-h">
-              <h3><Icon name={CAT_ICON[openCat]} size={14}/> {Fin.PRETTY_CAT[openCat]}</h3>
+              <h3><Icon name={CAT_ICON[openCat]} size={14}/> {Fin.PRETTY_CAT[openCat]} — {Fin.fmtMonth(selectedMonth)}</h3>
               <button className="back" onClick={() => setOpenCat(null)}>×</button>
             </header>
             <table className="data-tbl compact">
