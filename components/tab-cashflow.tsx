@@ -7,7 +7,7 @@ import { PairedBars, StackedBar, Treemap } from './charts.tsx';
 
 const CF_SAVINGS_LS = 'ledger_cashflow_show_savings';
 
-function CashflowTab() {
+function CashflowTab({ section }: { section?: string | null }) {
   const [windowMonths, setWindowMonths] = useStateCf(12);
   const [openCat, setOpenCat] = useStateCf<string | null>(null);
   const [ownerFilter, setOwnerFilter] = useStateCf('all');

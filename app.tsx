@@ -6,14 +6,15 @@ import { Fin } from './data/helpers.ts';
 import './data/db-loader.ts';
 import demoSource from './data/data.example.js?raw';
 window.__LEDGER_DEMO_SOURCE__ = demoSource;
-import { useTweaks, TweaksPanel, TweakSection, TweakToggle, TweakRadio, TweakSelect } from './tweaks-panel.tsx';
+import { useTweaks } from './tweaks-panel.tsx';
 import { Icon } from './components/icons.tsx';
 import { OverviewTab } from './components/tab-overview.tsx';
 import { AccountsTab } from './components/tab-accounts.tsx';
 import { CashflowTab } from './components/tab-cashflow.tsx';
 import { PassiveTab } from './components/tab-passive.tsx';
 import { IntakeTab } from './components/tab-intake.tsx';
-// Main app — shell, header, FX strip, tabs.
+import { Sidebar, useSidebar, SIDEBAR_WIDTH, SIDEBAR_RAIL } from './components/sidebar.jsx';
+// Main app — shell, header, sidebar, content.
 
 /* ── ErrorBoundary ────────────────────────────────────────────────────── */
 interface ErrorBoundaryProps {
@@ -124,51 +125,53 @@ function FxStrip({ rate, manualOpen, setManualOpen, manualRate, setManualRate }:
 const TAB_IDS = ['overview', 'accounts', 'cashflow', 'passive', 'intake'] as const;
 type TabId = typeof TAB_IDS[number];
 
-function parseUrl(): { tab: string; accountId: string | null } {
+function parseUrl(): { tab: string; accountId: string | null; section: string | null } {
   const segs = location.pathname.split('/').filter(Boolean);
   const tab = (TAB_IDS as readonly string[]).includes(segs[0]) ? segs[0] : 'overview';
   const accountId = (tab === 'accounts' && segs[1]) ? decodeURIComponent(segs[1]) : null;
-  return { tab, accountId };
+  const section = location.hash ? location.hash.slice(1) : null;
+  return { tab, accountId, section };
 }
 
-function pathFor(tab: string, accountId: string | null): string {
-  if (tab === 'accounts' && accountId) return `/accounts/${encodeURIComponent(accountId)}`;
-  if (tab === 'overview') return '/';
-  return `/${tab}`;
+function pathFor(tab: string, accountId: string | null, section?: string | null): string {
+  let path: string;
+  if (tab === 'accounts' && accountId) path = `/accounts/${encodeURIComponent(accountId)}`;
+  else if (tab === 'overview') path = '/';
+  else path = `/${tab}`;
+  if (section) path += `#${section}`;
+  return path;
 }
 
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const [{ tab, accountId }, setRoute] = useState(parseUrl);
+  const [{ tab, accountId, section }, setRoute] = useState(parseUrl);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualRate, setManualRate] = useState(window.FinanceData.FX.current);
-  // Bumped after a successful Intake; keys the data-driven tabs so they
-  // re-mount and re-derive from the freshly populated FinanceData.
   const [dataTick, setDataTick] = useState(0);
+  const sidebar = useSidebar();
 
-  const goTab = (id: string) => setRoute({ tab: id, accountId: null });
-  const openAccount = (id: string) => setRoute({ tab: 'accounts', accountId: id });
-  const closeAccount = () => setRoute({ tab: 'accounts', accountId: null });
+  const navigate = (tabId: string, sectionId?: string | null) => {
+    setRoute({ tab: tabId, accountId: null, section: sectionId || null });
+  };
+  const openAccount = (id: string) => setRoute({ tab: 'accounts', accountId: id, section: null });
+  const closeAccount = () => setRoute({ tab: 'accounts', accountId: null, section: null });
 
-  // apply manual rate
   useEffect(() => { window.FinanceData.FX.current = manualRate; }, [manualRate]);
 
-  // persist route in path
   useEffect(() => {
-    const want = pathFor(tab, accountId);
-    if (location.pathname !== want) {
-      history.pushState({ tab, accountId }, '', want);
+    const want = pathFor(tab, accountId, section);
+    const current = location.pathname + (location.hash || '');
+    if (current !== want) {
+      history.pushState({ tab, accountId, section }, '', want);
     }
-  }, [tab, accountId]);
+  }, [tab, accountId, section]);
 
-  // back/forward navigation
   useEffect(() => {
     const onPop = () => setRoute(parseUrl());
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  // theme
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', t.dark ? 'dark' : 'light');
     document.documentElement.setAttribute('data-density', t.density);
@@ -178,17 +181,21 @@ function App() {
     document.documentElement.style.setProperty('--accent-2', palette.accent2);
   }, [t.dark, t.density, t.privacy, t.accent]);
 
-  const tabs = [
-    { id: 'overview',  label: 'Overview' },
-    { id: 'accounts',  label: 'Accounts' },
-    { id: 'cashflow',  label: 'Cashflow' },
-    { id: 'passive',   label: 'Passive Income' },
-    { id: 'intake',    label: 'Intake' },
-  ];
+  const sidebarWidth = sidebar.isMobile ? 0
+    : sidebar.collapsed ? SIDEBAR_RAIL : SIDEBAR_WIDTH;
 
   return (
-    <div className="app">
+    <div className="app app-with-sidebar">
       <header className="app-h">
+        {sidebar.isMobile && (
+          <button
+            className="theme-toggle sb-menu-btn"
+            onClick={sidebar.toggle}
+            aria-label="Toggle menu"
+          >
+            <Icon name="menu" size={18}/>
+          </button>
+        )}
         <div className="brand">
           <span className="brand-mark">◐</span>
           <span className="brand-name">Ledger</span>
@@ -213,37 +220,29 @@ function App() {
           </button>
           <FxStrip rate={manualRate} manualOpen={manualOpen} setManualOpen={setManualOpen} manualRate={manualRate} setManualRate={setManualRate}/>
         </div>
-        <nav className="app-nav">
-          {tabs.map(tt => (
-            <button key={tt.id} data-screen-label={tt.label} className={tab === tt.id ? 'on' : ''} onClick={() => goTab(tt.id)}>{tt.label}</button>
-          ))}
-        </nav>
       </header>
 
-      <main className="app-main">
-        {tab === 'overview' && <OverviewTab key={`overview-${dataTick}`}/>}
-        {tab === 'accounts' && <AccountsTab key={`accounts-${dataTick}`} primaryCurrency={t.primaryCurrency} openAccountId={accountId} onOpenAccount={openAccount} onCloseAccount={closeAccount}/>}
-        {tab === 'cashflow' && <CashflowTab key={`cashflow-${dataTick}`}/>}
-        {tab === 'passive' && <PassiveTab key={`passive-${dataTick}`}/>}
-        {tab === 'intake' && <IntakeTab onIngested={() => setDataTick(x => x + 1)}/>}
-      </main>
-
-      <TweaksPanel>
-        <TweakSection label="Theme"/>
-        <TweakToggle label="Dark mode" value={t.dark} onChange={(v: boolean) => setTweak('dark', v)}/>
-        <TweakRadio label="Density" value={t.density} options={['compact','regular']} onChange={(v: string) => setTweak('density', v)}/>
-        <TweakSelect label="Accent" value={t.accent} options={['ochre','terracotta','ink','moss']} onChange={(v: string) => setTweak('accent', v)}/>
-        <TweakSection label="Display"/>
-        <TweakRadio label="Currency primary" value={t.primaryCurrency} options={['ILS','USD','native']} onChange={(v: string) => setTweak('primaryCurrency', v)}/>
-        <TweakToggle label="Pension detail groups" value={t.groupDetails} onChange={(v: boolean) => setTweak('groupDetails', v)}/>
-        <TweakToggle label="Privacy mode (hide ₪)" value={t.privacy} onChange={(v: boolean) => setTweak('privacy', v)}/>
-      </TweaksPanel>
+      <div className="app-body">
+        <Sidebar
+          tab={tab}
+          section={section}
+          onNavigate={navigate}
+          sidebar={sidebar}
+        />
+        <main className="app-main" style={{ marginLeft: sidebarWidth }}>
+          {tab === 'overview' && <OverviewTab key={`overview-${dataTick}`} section={section}/>}
+          {tab === 'accounts' && <AccountsTab key={`accounts-${dataTick}`} primaryCurrency={t.primaryCurrency} openAccountId={accountId} onOpenAccount={openAccount} onCloseAccount={closeAccount}/>}
+          {tab === 'cashflow' && <CashflowTab key={`cashflow-${dataTick}`} section={section}/>}
+          {tab === 'passive' && <PassiveTab key={`passive-${dataTick}`} section={section}/>}
+          {tab === 'intake' && <IntakeTab onIngested={() => setDataTick(x => x + 1)}/>}
+        </main>
+      </div>
     </div>
   );
 }
 
 function Bootstrap() {
-  const [phase, setPhase] = useState<string>('loading');   // loading | signin | fetching | ready | error
+  const [phase, setPhase] = useState<string>('loading');
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 

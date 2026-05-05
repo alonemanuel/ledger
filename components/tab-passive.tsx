@@ -4,7 +4,7 @@ import { Icon, ACC_TYPE_ICON } from './icons.tsx';
 import { StackedBar } from './charts.tsx';
 // Tab: Passive Income
 
-function PassiveTab() {
+function PassiveTab({ section }: { section?: string | null }) {
   const [windowMonths, setWindowMonths] = useStatePi(12);
   const months = Fin.ALL_MONTHS.slice(-windowMonths);
 

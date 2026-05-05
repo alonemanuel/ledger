@@ -97,7 +97,7 @@ function DonutCard({ title, entries, centerLabel, centerValue }: DonutCardProps)
   );
 }
 
-function OverviewTab() {
+function OverviewTab({ section }: { section?: string | null }) {
   const [ownerFilter, setOwnerFilter] = useStateOv('both');
   const accFilter = ownerFilter === 'both' ? () => true : (a: Account) => a.owner === ownerFilter;
 
